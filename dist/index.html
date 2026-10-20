@@ -19,7 +19,7 @@
   <header class="topbar">
     <a class="brand" href="./" aria-label="Wah Fat 收銀首頁"><span class="brand-mark">W<span>F</span></span><span>華發<small>收銀工作台</small></span></a>
     <div class="topbar-context"><span class="trial-badge"><i></i>試用版 · 本機記錄</span><span id="today-label"></span></div>
-    <div class="topbar-actions"><button id="history-button" class="icon-text"><span data-icon="history"></span><span>交易記錄</span></button><button id="info-button" class="icon-button" aria-label="商品來源及資料備份"><span data-icon="info"></span></button></div>
+    <div class="topbar-actions"><button id="report-button" class="icon-text"><span data-icon="chart"></span><span>日結報表</span></button><button id="history-button" class="icon-text"><span data-icon="history"></span><span>交易記錄</span></button><button id="info-button" class="icon-button" aria-label="商品來源及資料備份"><span data-icon="info"></span></button></div>
   </header>
   <div class="workspace">
     <aside class="sidebar" aria-label="商品分類">
@@ -31,7 +31,8 @@
     </aside>
     <main class="catalog-main">
       <div class="catalog-heading"><div><div class="eyebrow">POINT OF SALE</div><h1 id="category-title">所有商品</h1><p id="catalog-description">揀選商品，開始一張新訂單。</p></div><div class="catalog-count"><strong id="product-count">—</strong><span>款商品</span></div></div>
-      <div class="filter-bar"><div class="search-box"><span data-icon="search"></span><input id="search" type="search" placeholder="搜尋商品、規格或貨號" autocomplete="off" aria-label="搜尋商品、規格或貨號"><kbd>⌕</kbd></div><label class="vendor-select"><span class="sr-only">品牌</span><select id="vendor-filter"><option value="">全部品牌</option></select></label><button id="available-filter" class="stock-toggle" aria-pressed="false"><span class="toggle-dot"></span>只看可售</button></div>
+      <div class="filter-bar"><div class="search-box"><span data-icon="search"></span><input id="search" type="search" placeholder="搜尋商品、規格或貨號" autocomplete="off" aria-label="搜尋商品、規格或貨號"><button id="search-clear" class="search-clear" type="button" aria-label="清除搜尋" hidden><span data-icon="close"></span></button></div><label class="vendor-select"><span class="sr-only">品牌</span><select id="vendor-filter"><option value="">全部品牌</option></select></label><button id="available-filter" class="stock-toggle" aria-pressed="false"><span class="toggle-dot"></span>只看可售</button></div>
+      <section id="favorites-bar" class="favorites-bar" aria-label="常用款式" hidden></section>
       <div class="result-line"><span id="result-count" role="status">正在載入網站商品…</span><button id="reset-filters" class="text-button" hidden>清除篩選</button><span class="grid-note">輕觸商品以加入訂單</span></div>
       <div id="product-grid" class="product-grid" aria-label="商品列表"><div class="loading-card"><span class="spinner"></span><h2>商品目錄載入中</h2><p>準備網站商品、售價及圖片。</p></div></div>
       <div class="load-more-wrap"><button id="load-more" class="secondary-button" hidden>顯示更多商品</button></div>
@@ -40,6 +41,8 @@
     <aside id="cart-panel" class="cart-panel" aria-label="目前訂單">
       <div class="cart-heading"><div><span class="eyebrow">CURRENT ORDER</span><h2>目前訂單 <span id="cart-count" class="count-bubble">0</span></h2></div><button id="clear-cart" class="icon-button" aria-label="清空購物車" disabled><span data-icon="trash"></span></button><button id="close-mobile-cart" class="icon-button mobile-only" aria-label="關閉購物車"><span data-icon="close"></span></button></div>
       <div class="cart-tag"><span></span>門市銷售 · 本機試用</div>
+      <div class="cart-tools"><button id="note-button" class="tool-button" type="button"><span data-icon="note"></span><span id="note-label">備註／客戶</span></button><button id="hold-button" class="tool-button" type="button"><span data-icon="pause"></span><span>暫存</span></button><button id="held-button" class="tool-button" type="button"><span data-icon="inbox"></span><span>取回 <b id="held-count">0</b></span></button></div>
+      <div id="cart-memo" class="cart-memo" hidden></div>
       <div id="cart-items" class="cart-items"><div class="empty-cart"><span class="empty-cart-icon" data-icon="bag"></span><h3>準備好開始了</h3><p>輕觸左邊的商品，<br>為這張訂單加入第一件貨品。</p></div></div>
       <div class="cart-bottom"><div class="discount-row"><button id="discount-button" class="text-button"><span data-icon="tag"></span>加入訂單折扣</button><button id="remove-discount" class="text-button" hidden>移除</button></div><div class="totals-row"><span>商品小計</span><strong id="subtotal">HK$0.00</strong></div><div id="discount-total-row" class="totals-row discount-total" hidden><span>訂單折扣</span><strong id="discount-total">−HK$0.00</strong></div><div class="grand-total"><div>應收金額<small>港幣 HKD</small></div><strong id="total">$0.00</strong></div><button id="checkout-button" class="primary-button checkout-button" disabled><span data-icon="wallet"></span><span>收款</span><span aria-hidden="true">→</span></button><p class="local-note"><span data-icon="lock"></span>只記錄於這部裝置，不會實際扣款</p></div>
     </aside>

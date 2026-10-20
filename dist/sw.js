@@ -1,4 +1,4 @@
-const VERSION = 'wahfat-pos-v1-20261020';
+const VERSION = 'wahfat-pos-v2-20261020';
 const SHELL = `${VERSION}-shell`;
 const IMAGES = `${VERSION}-images`;
 const FILES = ['./', './index.html', './app.js', './pos-core.js', './styles.css',

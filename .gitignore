@@ -8,3 +8,4 @@ node_modules/
 .venv/
 .playwright-cli/
 output/playwright/
+tests/output/playwright/

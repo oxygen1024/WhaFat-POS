@@ -1,5 +1,5 @@
 // Run after starting the local preview server:
-// PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs node tests/browser-smoke.mjs
+// PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs [CHROMIUM_PATH=/path/to/chrome] node tests/browser-smoke.mjs
 import assert from 'node:assert/strict';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -15,7 +15,7 @@ const product = catalog.products.find(p => p.id === 7077097472129);
 const CART = 'wahfat-pos-cart-v1';
 const ORDERS = 'wahfat-pos-orders-v1';
 const results = [];
-const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, headless: true } : { channel: 'chrome', headless: true });
 const context = await browser.newContext({ viewport: { width: 1180, height: 820 }, timezoneId: 'Asia/Hong_Kong', hasTouch: true });
 const page = await context.newPage();
 const pageErrors = [];
@@ -164,7 +164,7 @@ try {
     for (const p of catalog.products.filter(p => p.variants.some(v => v.priceReviewReason && v.priceCents > 0))) {
       await chooseProduct(page, p);
       for (const variant of p.variants.filter(v => v.priceReviewReason && v.priceCents > 0)) {
-        const disabled = await page.locator('select[data-option="0"] option').evaluateAll((options, value) => options.find(option => option.value === value)?.disabled, variant.option1);
+        const disabled = await page.locator('button[data-option="0"][data-option-value]').evaluateAll((buttons, value) => buttons.find(button => button.dataset.optionValue === value)?.disabled, variant.option1);
         assert.equal(disabled, true, `Review price variant ${variant.id}`);
       }
       await close(page);
