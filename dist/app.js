@@ -103,7 +103,7 @@ function renderCategories() {
   $('#mobile-category').innerHTML='<option value="">所有分類</option>'+state.collections.map(collection=>`<option value="${esc(collection.id)}">${esc(collection.title)}</option>`).join('');
   $('#mobile-category').value=state.category;
 }
-function selectCategory(id) { state.category=String(id);state.pageLimit=48;renderCategories();renderProducts();$('.catalog-main').scrollTo({top:0,behavior:'smooth'}); }
+function selectCategory(id) { state.category=String(id);state.search='';$('#search').value='';$('#search-clear').hidden=true;state.pageLimit=48;renderCategories();renderProducts();$('.catalog-main').scrollTo({top:0,behavior:'smooth'}); }
 function filteredProducts() {
   const tokens=searchTokens(state.search);
   return state.products.filter(product => (!state.category || product.collectionIds?.some(id=>String(id)===state.category)) && (!state.vendor || product.vendor===state.vendor) && (!state.availableOnly || product.variants.some(isSaleable)) && matchesTokens(product._search,tokens));
