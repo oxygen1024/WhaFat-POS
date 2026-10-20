@@ -8,6 +8,7 @@ const ownUrl = path => new URL(path, self.registration.scope).href;
 const paths = new Set(FILES.map(path => new URL(ownUrl(path)).pathname));
 
 self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(caches.open(SHELL).then(cache => cache.addAll(FILES)));
 });
 self.addEventListener('activate', event => {

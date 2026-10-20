@@ -10,12 +10,25 @@
   <title>華發 · 收銀工作台</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
-  <link rel="stylesheet" href="./styles.css">
-  <script type="module" src="./app.js"></script>
-  <script type="module" src="./pwa.js"></script>
+  <link rel="stylesheet" href="./styles.css?v=__BUILD__">
+  <script>
+    (function () {
+      var show = function (message) {
+        var el = document.getElementById('app-fault');
+        if (!el) return;
+        el.hidden = false;
+        el.textContent = '程式發生錯誤：' + message + '。請重新整理頁面；如果持續出現，請截圖通知開發者。';
+      };
+      window.addEventListener('error', function (event) { if (event.target === window) show(event.message || '未知錯誤'); });
+      window.addEventListener('unhandledrejection', function (event) { show((event.reason && event.reason.message) || String(event.reason)); });
+    })();
+  </script>
+  <script type="module" src="./app.js?v=__BUILD__"></script>
+  <script type="module" src="./pwa.js?v=__BUILD__"></script>
 </head>
 <body>
   <div id="storage-warning" class="storage-warning" role="alert" hidden></div>
+  <div id="app-fault" class="storage-warning" role="alert" hidden></div>
   <header class="topbar">
     <a class="brand" href="./" aria-label="Wah Fat 收銀首頁"><span class="brand-mark">W<span>F</span></span><span>華發<small>收銀工作台</small></span></a>
     <div class="topbar-context"><span class="trial-badge"><i></i>試用版 · 本機記錄</span><span id="today-label"></span></div>

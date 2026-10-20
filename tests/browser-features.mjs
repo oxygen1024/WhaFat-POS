@@ -349,6 +349,21 @@ try {
     await page.setViewportSize({ width: 1180, height: 820 });
   });
 
+  await step('Info panel shows the program version and an uncaught script error raises a visible banner', async () => {
+    await page.locator('#info-button').click();
+    assert.match(await page.locator('#modal-root').innerText(), /程式版本：本機測試版/);
+    await closeModal();
+    assert.equal(await page.locator('#app-fault').isHidden(), true);
+    const other = await browser.newContext({ viewport: { width: 1180, height: 820 }, serviceWorkers: 'block' });
+    const probe = await other.newPage();
+    await probe.goto(base);
+    await probe.locator('[data-product]').first().waitFor();
+    await probe.evaluate(() => setTimeout(() => { throw new Error('boom'); }));
+    await probe.locator('#app-fault:not([hidden])').waitFor();
+    assert.match(await probe.locator('#app-fault').innerText(), /boom/);
+    await other.close();
+  });
+
   await step('No unhandled application errors occurred', async () => {
     assert.deepEqual(pageErrors, []);
   });

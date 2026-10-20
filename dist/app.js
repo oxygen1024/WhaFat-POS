@@ -1,4 +1,4 @@
-import { parseMoney, calculateTotals, makeSale, csvCell, sanitizeCustomer, sanitizeNote, voidSale, orderStatus, validateVoidFields, validateContactFields, hkDateKey, shiftDateKey, summarizeDay, searchTokens, matchesTokens, LIMITS } from './pos-core.js';
+import { parseMoney, calculateTotals, makeSale, csvCell, sanitizeCustomer, sanitizeNote, voidSale, orderStatus, validateVoidFields, validateContactFields, hkDateKey, shiftDateKey, summarizeDay, searchTokens, matchesTokens, LIMITS } from './pos-core.js?v=__BUILD__';
 
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -7,6 +7,7 @@ const shortMoney = cents => '$' + (Number(cents) / 100).toLocaleString('en-HK', 
 const dateTime = value => new Date(value).toLocaleString('zh-HK', { timeZone:'Asia/Hong_Kong', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false });
 const CART_KEY = 'wahfat-pos-cart-v1';
 const ORDERS_KEY = 'wahfat-pos-orders-v1';
+const BUILD = '__BUILD__';
 const HELD_KEY = 'wahfat-pos-held-v1';
 const FAVORITES_KEY = 'wahfat-pos-favorites-v1';
 const MAX_HELD = 20;
@@ -302,7 +303,7 @@ function exportCsv() {
 function openInfo() {
   const catalog=state.catalog, summary=catalog?.summary || {};const variants=state.products.flatMap(p=>p.variants);
   const needsReview=variants.filter(v=>v.priceReviewReason || v.priceCents<=0).length;
-  openModal('商品資料與備份',`<p>商品名稱、款式、售價及圖片來自 <a href="https://whafat-hk.com/" target="_blank" rel="noopener noreferrer">華發科技有限公司網站 ↗</a>。</p><div class="info-grid"><div class="info-stat"><strong>${state.products.length}</strong><span>網站商品</span></div><div class="info-stat"><strong>${variants.length.toLocaleString()}</strong><span>商品款式</span></div></div><p>資料擷取：${catalog?.importedAt?esc(dateTime(catalog.importedAt)):'尚未載入'}</p><ul class="info-list"><li>目前使用網站資料快照，價格及可售狀態不會自動更新。結帳前請確認實際價格與存貨。</li><li>${needsReview} 款網站價格需要確認，已暫停加入訂單；其他網站標示不可售的款式亦不可加入。</li><li>沒有連接網站庫存、會員或支付服務。轉數快、PayMe、信用卡及八達通只作付款方式記錄。</li><li>圖片直接取自網站。首次載入完成、且瀏覽器支援離線儲存後，已載入的目錄可離線使用；未看過的圖片仍可能需要網絡。缺少原圖的商品會顯示「暫無圖片」。</li><li>目前網站商品資料沒有條碼；搜尋可使用商品名稱、款式或已提供的貨號。</li><li>交易只儲存在目前瀏覽器。清除網站資料、私密瀏覽或更換裝置可能令記錄遺失，請定期備份。</li><li>客戶名稱、電話及備註只保存在這部裝置，並會出現在收據、交易記錄及備份檔案內；請只輸入有需要的資料，並妥善保管備份。</li></ul><h3 class="section-title">備份本機交易</h3><p style="margin-bottom:13px">JSON 保留完整訂單；CSV 適合在試算表查看銷售明細。</p><div class="backup-actions"><button class="secondary-button" data-action="export-json">下載完整備份</button><button class="secondary-button" data-action="export-csv">下載銷售 CSV</button></div><h3 class="section-title">在 iPad 使用</h3><p>用 Safari 開啟本頁，點選「分享」→「加入主畫面」。建議固定使用同一部裝置及同一個瀏覽器保存試用交易。</p>`,{kind:'info'});
+  openModal('商品資料與備份',`<p>商品名稱、款式、售價及圖片來自 <a href="https://whafat-hk.com/" target="_blank" rel="noopener noreferrer">華發科技有限公司網站 ↗</a>。</p><div class="info-grid"><div class="info-stat"><strong>${state.products.length}</strong><span>網站商品</span></div><div class="info-stat"><strong>${variants.length.toLocaleString()}</strong><span>商品款式</span></div></div><p>資料擷取：${catalog?.importedAt?esc(dateTime(catalog.importedAt)):'尚未載入'}</p><p>程式版本：${BUILD.startsWith('__')?'本機測試版':esc(BUILD)}</p><ul class="info-list"><li>目前使用網站資料快照，價格及可售狀態不會自動更新。結帳前請確認實際價格與存貨。</li><li>${needsReview} 款網站價格需要確認，已暫停加入訂單；其他網站標示不可售的款式亦不可加入。</li><li>沒有連接網站庫存、會員或支付服務。轉數快、PayMe、信用卡及八達通只作付款方式記錄。</li><li>圖片直接取自網站。首次載入完成、且瀏覽器支援離線儲存後，已載入的目錄可離線使用；未看過的圖片仍可能需要網絡。缺少原圖的商品會顯示「暫無圖片」。</li><li>目前網站商品資料沒有條碼；搜尋可使用商品名稱、款式或已提供的貨號。</li><li>交易只儲存在目前瀏覽器。清除網站資料、私密瀏覽或更換裝置可能令記錄遺失，請定期備份。</li><li>客戶名稱、電話及備註只保存在這部裝置，並會出現在收據、交易記錄及備份檔案內；請只輸入有需要的資料，並妥善保管備份。</li></ul><h3 class="section-title">備份本機交易</h3><p style="margin-bottom:13px">JSON 保留完整訂單；CSV 適合在試算表查看銷售明細。</p><div class="backup-actions"><button class="secondary-button" data-action="export-json">下載完整備份</button><button class="secondary-button" data-action="export-csv">下載銷售 CSV</button></div><h3 class="section-title">在 iPad 使用</h3><p>用 Safari 開啟本頁，點選「分享」→「加入主畫面」。建議固定使用同一部裝置及同一個瀏覽器保存試用交易。</p>`,{kind:'info'});
 }
 function setSearch(value,{focus=false}={}) {
   state.search=value;state.pageLimit=48;$('#search').value=value;$('#search-clear').hidden=!value;renderProducts();
