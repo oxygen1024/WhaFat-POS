@@ -1,0 +1,10 @@
+.DS_Store
+data/source/
+tests/artifacts/
+*.tar
+*.tar.gz
+__pycache__/
+node_modules/
+.venv/
+.playwright-cli/
+output/playwright/

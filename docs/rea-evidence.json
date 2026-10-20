@@ -1,0 +1,132 @@
+[
+  {
+    "evidenceId": "ev_d1f001e1efd958a76bda323818299c3b15d14df22e062801a17d08d64611e0b0",
+    "operation": "capture_browser_scenario",
+    "sourceUrl": "https://whafat-hk.com/",
+    "actions": [
+      {
+        "step_id": "load_catalog",
+        "action": "wait_for_timeout",
+        "duration_ms": 1500
+      }
+    ],
+    "completeness": {
+      "status": "incomplete",
+      "equality_eligible": false,
+      "missing_sections": [
+        "events"
+      ],
+      "truncated_sections": []
+    },
+    "browser": {
+      "mode": "launch",
+      "process_ownership": "provider-owned",
+      "cleanup": "terminated-owned-process",
+      "product": "Chromium",
+      "version": "155.0.8059.85"
+    },
+    "domSha256": "279b5ab3060de614e8446c815681c4703d941a03502474696d67e3ac679abe35",
+    "observations": {
+      "platform": "Shopify",
+      "theme": "Craft",
+      "themeVersion": "5.0.1",
+      "currency": "HKD"
+    },
+    "limitations": [
+      "DOM observed; event collection truncated (180 retained; 428 omitted). Network-wide completeness not established.",
+      "No admin access or stock counts inspected."
+    ]
+  },
+  {
+    "evidenceId": "ev_3322dd8b5e06200062dfa22100fe55798395bf5b8a2c0c5eca808c32155fa3ba",
+    "operation": "capture_browser_scenario",
+    "sourceUrl": "https://whafat-hk.com/products/philips-%E9%A3%9B%E5%88%A9%E6%B5%A6moire-%E5%A4%A9%E8%8A%B1%E6%9D%BF%E7%87%88%E6%98%9F%E7%B4%8B%E9%96%83%E7%88%8D17w-20w-4000k",
+    "actions": [
+      {
+        "step_id": "ready",
+        "timeout_ms": 20000,
+        "action": "wait_for",
+        "locator": {
+          "kind": "css",
+          "selector": "product-form"
+        },
+        "state": "visible"
+      }
+    ],
+    "completeness": {
+      "status": "complete",
+      "equality_eligible": true,
+      "missing_sections": [],
+      "truncated_sections": []
+    },
+    "browser": {
+      "mode": "launch",
+      "process_ownership": "provider-owned",
+      "cleanup": "terminated-owned-process",
+      "product": "Chromium",
+      "version": "155.0.8059.85"
+    },
+    "domSha256": "288515ee7925d87836508d4d98ca2a1e4033bf4ba682e0e6cd885abf19777812",
+    "observations": {
+      "accessibilityExtract": [
+        "    - heading \"Philips 飛利浦Moire 天花板燈星紋閃爍17w / 20w 4000k\" [level=1]",
+        "    - status: 定價 HK$226.00",
+        "      - radio \"17w\" [checked]",
+        "      - radio \"20w\"",
+        "    - heading \"Philips 飛利浦Moire 天花板燈星紋閃爍17w / 20w 4000k\" [level=2]"
+      ]
+    },
+    "limitations": [
+      "Selected public page and declared variant action only. No checkout or payment performed."
+    ]
+  },
+  {
+    "evidenceId": "ev_795ca8b7ac999edd40f67e16b6eb7f7c6dfdf9c75235855713a42ee923530e94",
+    "operation": "capture_browser_scenario",
+    "sourceUrl": "https://whafat-hk.com/products/philips-%E9%A3%9B%E5%88%A9%E6%B5%A6moire-%E5%A4%A9%E8%8A%B1%E6%9D%BF%E7%87%88%E6%98%9F%E7%B4%8B%E9%96%83%E7%88%8D17w-20w-4000k",
+    "actions": [
+      {
+        "step_id": "choose_20w_label",
+        "timeout_ms": 10000,
+        "action": "click",
+        "locator": {
+          "kind": "css",
+          "selector": "label[for=\"template--14451313279105__main-1-1\"]"
+        },
+        "button": "left",
+        "click_count": 1
+      },
+      {
+        "step_id": "price_update",
+        "action": "wait_for_timeout",
+        "duration_ms": 1000
+      }
+    ],
+    "completeness": {
+      "status": "complete",
+      "equality_eligible": true,
+      "missing_sections": [],
+      "truncated_sections": []
+    },
+    "browser": {
+      "mode": "launch",
+      "process_ownership": "provider-owned",
+      "cleanup": "terminated-owned-process",
+      "product": "Chromium",
+      "version": "155.0.8059.85"
+    },
+    "domSha256": "e96a0f8f8826aec2673f54f290ef044c9dc106c45ad056638dd2dae38cd05662",
+    "observations": {
+      "accessibilityExtract": [
+        "    - heading \"Philips 飛利浦Moire 天花板燈星紋閃爍17w / 20w 4000k\" [level=1]",
+        "    - status: 定價 HK$262.00",
+        "      - radio \"17w\"",
+        "      - radio \"20w\" [checked]",
+        "    - heading \"Philips 飛利浦Moire 天花板燈星紋閃爍17w / 20w 4000k\" [level=2]"
+      ]
+    },
+    "limitations": [
+      "Selected public page and declared variant action only. No checkout or payment performed."
+    ]
+  }
+]
