@@ -7,10 +7,10 @@ for size in [192, 512] {
         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-    NSColor(srgbRed: 20/255, green: 63/255, blue: 59/255, alpha: 1).setFill()
+    NSColor(srgbRed: 243/255, green: 203/255, blue: 63/255, alpha: 1).setFill()
     NSBezierPath(rect: NSRect(x: 0, y: 0, width: size, height: size)).fill()
     let s = CGFloat(size)
-    NSColor(srgbRed: 240/255, green: 200/255, blue: 123/255, alpha: 1).setStroke()
+    NSColor(srgbRed: 43/255, green: 36/255, blue: 18/255, alpha: 1).setStroke()
     let p = NSBezierPath()
     p.lineWidth = s * 0.055
     p.lineCapStyle = .round

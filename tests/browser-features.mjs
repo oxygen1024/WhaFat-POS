@@ -75,6 +75,47 @@ try {
     await page.locator('#search-clear').click();
   });
 
+  await step('Switching category empties the search box (sidebar and phone dropdown)', async () => {
+    await page.locator('#search').fill('Philips');
+    assert.equal(await page.locator('#search-clear').isVisible(), true);
+    const category = page.locator('#categories [data-category]').first();
+    const expected = await category.locator('b').innerText();
+    await category.click();
+    assert.equal(await page.locator('#search').inputValue(), '');
+    assert.equal(await page.locator('#search-clear').isHidden(), true);
+    assert.equal(await page.locator('#product-count').innerText(), expected);
+    await page.locator('#all-products').click();
+    assert.equal(await page.locator('#search').inputValue(), '');
+    assert.equal(await page.locator('#product-count').innerText(), String(catalog.products.length));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator('#search').fill('Philips');
+    const option = await page.locator('#mobile-category option').nth(1).getAttribute('value');
+    await page.locator('#mobile-category').selectOption(option);
+    assert.equal(await page.locator('#search').inputValue(), '');
+    assert.equal(await page.locator('#search-clear').isHidden(), true);
+    await page.locator('#mobile-category').selectOption('');
+    await page.setViewportSize({ width: 1180, height: 820 });
+  });
+
+  await step('Theme is white and yellow: white surfaces, yellow action colour, dark text on yellow', async () => {
+    const colours = await page.evaluate(() => {
+      const css = (selector, property) => getComputedStyle(document.querySelector(selector))[property];
+      return { page: css('body', 'backgroundColor'), root: css('html', 'backgroundColor'), card: css('.product-card', 'backgroundColor'), brand: css('.brand-mark', 'backgroundColor'), add: css('.product-add', 'backgroundColor'), topbar: css('.topbar', 'borderBottomColor'), checkout: css('#checkout-button', 'backgroundColor'), checkoutText: css('#checkout-button', 'color') };
+    });
+    const yellow = 'rgb(243, 203, 63)';
+    assert.equal(colours.root, 'rgb(255, 255, 255)');
+    assert.equal(colours.card, 'rgb(255, 255, 255)');
+    assert.equal(colours.brand, yellow);
+    assert.equal(colours.add, yellow);
+    assert.equal(colours.topbar, yellow);
+    await page.locator('#search').fill(plain.title);
+    await page.locator(`[data-product="${plain.id}"]`).click();
+    assert.equal(await page.locator('#add-product').evaluate(el => getComputedStyle(el).backgroundColor), yellow);
+    assert.equal(await page.locator('#add-product').evaluate(el => getComputedStyle(el).color), 'rgb(43, 36, 18)');
+    await closeModal();
+    await page.locator('#search-clear').click();
+  });
+
   await step('Variant picker lists all 48 switch types with prices and filters by several words', async () => {
     await openSwitches();
     assert.equal(await page.locator('#vp-count').innerText(), '共 48 款');
