@@ -23,6 +23,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Stamp build id into asset URLs
+        run: grep -rl '__BUILD__' dist --include='*.html' --include='*.js' | xargs sed -i "s/__BUILD__/${GITHUB_SHA::7}/g"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
