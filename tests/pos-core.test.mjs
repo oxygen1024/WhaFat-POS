@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { parseMoney, calculateTotals, makeSale, csvCell } from '../dist/pos-core.js';
+import { parseMoney, calculateTotals, makeSale, csvCell, sanitizeCustomer, sanitizeNote, voidSale, orderStatus, validateVoidFields, validateContactFields, hkDateKey, shiftDateKey, summarizeDay, searchTokens, matchesTokens } from '../dist/pos-core.js';
 
 const catalog = JSON.parse(await readFile(new URL('../dist/data/catalog.json', import.meta.url), 'utf8'));
 const item = (priceCents = 22600, quantity = 1) => ({
@@ -114,4 +114,88 @@ test('CSV export quotes text and neutralises spreadsheet formula prefixes', () =
   assert.equal(csvCell('=1+1'), '"\'=1+1"');
   assert.equal(csvCell('@SUM(1,2)'), '"\'@SUM(1,2)"');
   assert.equal(csvCell('普通商品'), '"普通商品"');
+});
+
+test('Customer details and notes are trimmed, bounded, optional, and kept off the sale when empty', () => {
+  assert.deepEqual(sanitizeCustomer({ name: '  陳  先生 ', phone: ' 9123\t4567 ' }), { name: '陳 先生', phone: '9123 4567' });
+  assert.equal(sanitizeCustomer({ name: 'x'.repeat(100) }).name.length, 60);
+  assert.equal(sanitizeNote('x'.repeat(500)).length, 300);
+  assert.equal(sanitizeNote('\u0000送貨\n樓下'), '送貨\n樓下');
+  const plain = sale();
+  assert.equal('customer' in plain, false);
+  assert.equal('note' in plain, false);
+  const withContact = sale({ customer: { name: '陳先生', phone: '91234567' }, note: '星期五送貨' });
+  assert.deepEqual(withContact.customer, { name: '陳先生', phone: '91234567' });
+  assert.equal(withContact.note, '星期五送貨');
+  assert.equal('customer' in sale({ customer: { name: '  ', phone: '' } }), false);
+});
+
+test('Voiding or refunding keeps the original sale, needs a reason, and can only happen once', () => {
+  const original = sale();
+  assert.equal(orderStatus(original), 'completed');
+  const voided = voidSale(original, { type: 'void', reason: ' 輸入錯誤 ', at: '2026-10-20T11:00:00.000Z' });
+  assert.equal(voided.status, 'voided');
+  assert.equal(voided.voidReason, '輸入錯誤');
+  assert.equal(voided.totalCents, original.totalCents);
+  assert.equal(original.status, undefined);
+  assert.equal(voidSale(original, { type: 'refund', reason: '退貨' }).status, 'refunded');
+  assert.throws(() => voidSale(voided, { type: 'refund', reason: '退貨' }), /已經作廢或退款/);
+  assert.throws(() => voidSale(original, { type: 'other', reason: 'x' }));
+  assert.throws(() => voidSale(original, { type: 'void', reason: '   ' }), /原因/);
+  assert.throws(() => voidSale(original, { type: 'void', reason: 'x', at: 'not a date' }));
+  assert.doesNotThrow(() => validateVoidFields(original));
+  assert.doesNotThrow(() => validateVoidFields(voided));
+  assert.throws(() => validateVoidFields({ ...original, status: 'voided' }));
+  assert.throws(() => validateVoidFields({ ...original, status: 'paid', voidedAt: voided.voidedAt, voidReason: 'x' }));
+  assert.throws(() => validateVoidFields({ ...original, voidReason: 'orphan' }));
+});
+
+test('Hong Kong date keys follow local midnight, not UTC', () => {
+  assert.equal(hkDateKey('2026-10-20T15:59:59.000Z'), '2026-10-20');
+  assert.equal(hkDateKey('2026-10-20T16:00:00.000Z'), '2026-10-21');
+  assert.equal(hkDateKey('garbage'), '');
+  assert.equal(shiftDateKey('2026-10-31', 1), '2026-11-01');
+  assert.equal(shiftDateKey('2026-01-01', -1), '2025-12-31');
+  assert.equal(shiftDateKey('bad', 1), '');
+});
+
+test('Daily summary counts sales on the order day and voids on the day they were processed', () => {
+  const orders = [
+    sale({ id: 'A', createdAt: '2026-10-20T02:00:00.000Z', tenderedCents: 30000 }),
+    sale({ id: 'B', createdAt: '2026-10-20T03:00:00.000Z', items: [{ ...item(10000, 2), variantId: 1 }], discount: { type: 'fixed', value: 500 }, paymentMethod: 'fps', confirmed: true }),
+    voidSale(sale({ id: 'C', createdAt: '2026-10-20T04:00:00.000Z', tenderedCents: 30000 }), { type: 'void', reason: '輸入錯誤', at: '2026-10-20T04:10:00.000Z' }),
+    voidSale(sale({ id: 'D', createdAt: '2026-10-19T04:00:00.000Z', tenderedCents: 30000 }), { type: 'refund', reason: '退貨', at: '2026-10-20T05:00:00.000Z' }),
+    sale({ id: 'E', createdAt: '2026-10-20T17:00:00.000Z', tenderedCents: 30000 }),
+  ];
+  const day = summarizeDay(orders, '2026-10-20');
+  assert.equal(day.orderCount, 3);
+  assert.equal(day.salesCents, 22600 + 19500 + 22600);
+  assert.equal(day.discountCents, 500);
+  assert.equal(day.voidCount, 2);
+  assert.equal(day.voidCents, 22600 * 2);
+  assert.equal(day.netCents, day.salesCents - day.voidCents);
+  assert.deepEqual(day.methods.map(m => [m.method, m.count, m.salesCents, m.voidCount, m.voidCents, m.netCents]), [['cash', 2, 45200, 2, 45200, 0], ['fps', 1, 19500, 0, 0, 19500]]);
+  assert.deepEqual(day.items.map(row => [row.quantity, row.amountCents]), [[2, 20000], [1, 22600]]);
+  assert.deepEqual(day.voids.map(v => [v.id, v.status]), [['C', 'voided'], ['D', 'refunded']]);
+  const next = summarizeDay(orders, '2026-10-21');
+  assert.deepEqual([next.orderCount, next.salesCents, next.voidCount, next.netCents], [1, 22600, 0, 22600]);
+  assert.deepEqual(summarizeDay([], '2026-10-20').methods, []);
+});
+
+test('Search tokens match in any order, ignore case, and need every word', () => {
+  const tokens = searchTokens('  雙控  LED ');
+  assert.deepEqual(tokens, ['雙控', 'led']);
+  assert.equal(matchesTokens('單位雙控連led指示燈', tokens), true);
+  assert.equal(matchesTokens('單位單控連led指示燈', tokens), false);
+  assert.equal(matchesTokens('anything', []), true);
+});
+
+test('Stored customer and note fields must have the right shape', () => {
+  const plain = sale();
+  assert.doesNotThrow(() => validateContactFields(plain));
+  assert.doesNotThrow(() => validateContactFields(sale({ customer: { name: '陳', phone: '' }, note: 'x' })));
+  assert.throws(() => validateContactFields({ ...plain, customer: 'x' }));
+  assert.throws(() => validateContactFields({ ...plain, customer: { name: 1, phone: '' } }));
+  assert.throws(() => validateContactFields({ ...plain, customer: null }));
+  assert.throws(() => validateContactFields({ ...plain, note: 5 }));
 });
