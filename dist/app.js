@@ -292,7 +292,8 @@ async function completeSale() {
       const variant=product&&getVariant(product,item.variantId);
       if (!variant || !isSaleable(variant) || variant.priceCents!==item.priceCents) throw new Error('有商品的價格或供應狀態需要重新確認。');
     }
-    const sale=makeSale({items:state.cart.items,discount:state.cart.discount,paymentMethod:state.paymentMethod,tenderedCents:state.paymentMethod==='cash'?parseMoney(state.paymentTendered):undefined,confirmed:state.paymentConfirmed,id:state.cart.id,customer:state.cart.customer,note:state.cart.note});
+    const sale=pendingSale?.id===state.cart.id ? pendingSale : makeSale({items:state.cart.items,discount:state.cart.discount,paymentMethod:state.paymentMethod,tenderedCents:state.paymentMethod==='cash'?parseMoney(state.paymentTendered):undefined,confirmed:state.paymentConfirmed,id:state.cart.id,customer:state.cart.customer,note:state.cart.note});
+    pendingSale=sale;
     // Cloud write is the source of truth. Never mark a sale successful based only on local storage.
     await cloud.saveSale(sale);
     await cloudOrdersRefresh();
