@@ -4,6 +4,7 @@ import { parseMoney, calculateTotals, makeSale, csvCell, sanitizeCustomer, sanit
 const $ = selector => document.querySelector(selector);
 const cloud = makeCloudClient();
 let cloudReady = false;
+let pendingSale = null;
 async function cloudOrdersRefresh() {
   const rows = await cloud.orders();
   state.orders = readableOrders(rows.filter(row => row.receipt_json).map(row => ({...row.receipt_json, status:row.status, localOnly:true})));
