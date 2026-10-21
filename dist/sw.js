@@ -1,4 +1,4 @@
-const VERSION = 'wahfat-pos-cloud-v8-20261021';
+const VERSION = 'wahfat-pos-cloud-v9-20261021';
 const SHELL = `${VERSION}-shell`;
 const IMAGES = `${VERSION}-images`;
 const FILES = ['./', './index.html', './app.js', './pos-core.js', './styles.css',
