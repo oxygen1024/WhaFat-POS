@@ -1,5 +1,8 @@
 -- Security and performance hardening from the Supabase advisors (2026-10-21).
--- Not yet applied to project crbhacmnjtzokvzqwkex; apply after review.
+-- Applied to project crbhacmnjtzokvzqwkex on 2026-10-21 statement by statement (the MCP
+-- apply_migration call timed out), so it is not listed in supabase_migrations.schema_migrations.
+-- Every statement is idempotent. EXCEPTION: section 4 (drop policy) is NOT applied yet;
+-- run it in the Supabase SQL editor.
 
 -- 1. Private allow-list: RLS on with no policies. Only pos_private.is_authorized()
 --    (SECURITY DEFINER, owned by postgres, the table owner) reads it, and owners bypass RLS.
@@ -13,7 +16,7 @@ grant select on table public.products, public.product_variants to authenticated;
 -- 3. Transaction tables: anon has no policy, so drop its unused SELECT grant too.
 revoke all on table public.orders, public.order_items, public.payments, public.refunds from anon;
 
--- 4. Leftover direct-write policies. Writes go only through the RPCs (table grants are SELECT-only),
+-- 4. NOT YET APPLIED. Leftover direct-write policies. Writes go only through the RPCs (table grants are SELECT-only),
 --    so these policies are dead and would become live if a grant were ever re-added.
 drop policy if exists pos_insert_orders on public.orders;
 drop policy if exists pos_update_orders on public.orders;
