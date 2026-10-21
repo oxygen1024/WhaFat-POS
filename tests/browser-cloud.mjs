@@ -22,6 +22,11 @@ function mockSupabase() {
       if (db.authorized === undefined) return json({ code: 'PGRST202', message: 'Could not find the function' }, 404);
       return json(db.authorized);
     }
+    if (url.pathname === '/rest/v1/rpc/pos_delete_order') {
+      const id = route.request().postDataJSON().p_order_id;
+      db.orders = db.orders.filter(o => o.id !== id);
+      return json({ id, deleted: true });
+    }
     if (url.pathname === '/rest/v1/rpc/pos_save_sale') {
       db.saveCalls++;
       const sale = route.request().postDataJSON().p_sale;
@@ -176,6 +181,28 @@ await step('An authorized account passes the access check and logs in', async ()
   const { context, page } = await freshPage(db);
   await login(page);
   assert.equal(await page.locator('#cloud-status').getAttribute('data-state'), 'online');
+  await context.close();
+});
+
+await step('A saved order can be deleted from its receipt after confirming', async () => {
+  const db = mockSupabase();
+  const { context, page } = await freshPage(db);
+  await login(page);
+  await addProduct(page);
+  await payCashExact(page);
+  await page.getByText('這張訂單完成了').waitFor();
+  const id = db.orders[0].id;
+  await page.click('#modal-root [data-action="close-modal"]');
+  await page.click('#history-button');
+  await page.locator(`[data-order="${id}"]`).click();
+  page.once('dialog', dialog => dialog.dismiss());   // cancelling keeps the order
+  await page.locator(`[data-delete-order="${id}"]`).click();
+  await page.waitForTimeout(300);
+  assert.equal(db.orders.length, 1);
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator(`[data-delete-order="${id}"]`).click();
+  await page.getByText('還未有交易記錄').waitFor();
+  assert.equal(db.orders.length, 0);
   await context.close();
 });
 

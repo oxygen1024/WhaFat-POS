@@ -94,6 +94,7 @@ export function makeCloudClient(publishableKey = SUPABASE_PUBLISHABLE_KEY) {
     get isSignedIn() { return !!session?.access_token; },
     saveSale: sale => rpc('pos_save_sale', { p_sale: sale }),
     voidSale: (id, type, reason) => rpc('pos_void_sale', { p_order_id: id, p_type: type, p_reason: reason }),
+    deleteSale: id => rpc('pos_delete_order', { p_order_id: id }),
     orders, orderById
   };
 }
