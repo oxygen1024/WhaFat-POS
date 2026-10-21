@@ -7,6 +7,7 @@ let cloudReady = false;
 let pendingSale = null;
 async function cloudOrdersRefresh() {
   const rows = await cloud.orders();
+  if(rows.length >= 1000) console.warn('Only the latest 1000 cloud orders are loaded; historical reports may be incomplete.');
   state.orders = readableOrders(rows.filter(row => row.receipt_json).map(row => ({...row.receipt_json, status:row.status, localOnly:true})));
 }
 async function requireCloudLogin() {
