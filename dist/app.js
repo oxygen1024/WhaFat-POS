@@ -273,7 +273,7 @@ function paymentContent() {
   const totals=calculateTotals(state.cart.items,state.cart.discount);
   const methods=Object.entries(PAYMENT_NAMES).map(([key,name])=>`<button type="button" class="payment-method ${state.paymentMethod===key?'active':''}" data-payment="${key}" aria-pressed="${state.paymentMethod===key}">${icon(key==='cash'?'cash':key==='fps'||key==='payme'?'phone':'card')}${name}</button>`).join('');
   const cash=state.paymentMethod==='cash';
-  return `<form id="payment-form"><div class="payment-total"><span>${totals.itemCount} 件商品 · 應收金額</span><strong>${money(totals.totalCents)}</strong></div><div class="payment-methods">${methods}</div>${cash?`<label class="field"><span>實收現金（HK$）</span><input id="tendered" class="cash-input" inputmode="decimal" autocomplete="off" placeholder="0.00" value="${esc(state.paymentTendered)}"><div class="quick-cash">${[...new Set([totals.totalCents,10000,50000,100000].filter(c=>c>=totals.totalCents))].map((amount,index)=>`<button type="button" data-tender="${amount}">${index===0?'剛好':money(amount)}</button>`).join('')}</div></label><div class="change-row"><span>找續</span><strong id="change-amount">—</strong></div>`:`<p class="payment-notice">請在外部收款設備或相應 App 完成 ${esc(PAYMENT_NAMES[state.paymentMethod])} 收款。本頁只記錄付款方式，沒有連接支付服務。</p><label class="payment-confirm"><input id="payment-confirmed" type="checkbox" ${state.paymentConfirmed?'checked':''}><span>我已在外部確認收款成功，現在建立本機試用記錄。</span></label>`}<p class="payment-notice">試用記錄只會保存在目前瀏覽器；不會向顧客實際扣款，亦不會更新網站庫存。</p><p id="payment-error" class="form-error" role="alert" hidden></p><button type="submit" id="complete-sale" class="primary-button" style="width:100%">${icon('check')}完成本機試用記錄</button></form>`;
+  return `<form id="payment-form"><div class="payment-total"><span>${totals.itemCount} 件商品 · 應收金額</span><strong>${money(totals.totalCents)}</strong></div><div class="payment-methods">${methods}</div>${cash?`<label class="field"><span>實收現金（HK$）</span><input id="tendered" class="cash-input" inputmode="decimal" autocomplete="off" placeholder="0.00" value="${esc(state.paymentTendered)}"><div class="quick-cash">${[...new Set([totals.totalCents,10000,50000,100000].filter(c=>c>=totals.totalCents))].map((amount,index)=>`<button type="button" data-tender="${amount}">${index===0?'剛好':money(amount)}</button>`).join('')}</div></label><div class="change-row"><span>找續</span><strong id="change-amount">—</strong></div>`:`<p class="payment-notice">請在外部收款設備或相應 App 完成 ${esc(PAYMENT_NAMES[state.paymentMethod])} 收款。本頁只記錄付款方式，沒有連接支付服務。</p><label class="payment-confirm"><input id="payment-confirmed" type="checkbox" ${state.paymentConfirmed?'checked':''}><span>我已在外部確認收款成功，現在建立雲端交易記錄。</span></label>`}<p class="payment-notice">試用記錄只會保存在目前瀏覽器；不會向顧客實際扣款，亦不會更新網站庫存。</p><p id="payment-error" class="form-error" role="alert" hidden></p><button type="submit" id="complete-sale" class="primary-button" style="width:100%">${icon('check')}完成雲端交易記錄</button></form>`;
 }
 function openPayment(reset=true) {
   if (!state.cart.items.length || !state.storageOk)return;
@@ -336,7 +336,7 @@ function exportCsv() {
   const headers=['訂單編號','香港時間','記錄類型','付款方式','商品名稱','款式','貨號','單價 HKD','數量','商品金額 HKD','訂單小計 HKD','訂單折扣 HKD','訂單總額 HKD','實收 HKD','找續 HKD','訂單狀態','客戶名稱','聯絡電話','訂單備註','作廢／退款時間','作廢／退款原因'];
   const rows=state.orders.flatMap(order=>order.items.map((item,index)=>{
     const status=orderStatus(order);
-    return [order.id,dateTime(order.createdAt),'本機試用',PAYMENT_NAMES[order.paymentMethod] || order.paymentMethod,item.title,item.variantTitle,item.sku,(item.priceCents/100).toFixed(2),item.quantity,(item.priceCents*item.quantity/100).toFixed(2),index?'':(order.subtotalCents/100).toFixed(2),index?'':(order.discountCents/100).toFixed(2),index?'':(order.totalCents/100).toFixed(2),index?'':(order.tenderedCents/100).toFixed(2),index?'':(order.changeCents/100).toFixed(2),STATUS_NAMES[status] || '有效',index?'':order.customer?.name || '',index?'':order.customer?.phone || '',index?'':order.note || '',index||status==='completed'?'':dateTime(order.voidedAt),index?'':order.voidReason || ''];
+    return [order.id,dateTime(order.createdAt),'雲端交易',PAYMENT_NAMES[order.paymentMethod] || order.paymentMethod,item.title,item.variantTitle,item.sku,(item.priceCents/100).toFixed(2),item.quantity,(item.priceCents*item.quantity/100).toFixed(2),index?'':(order.subtotalCents/100).toFixed(2),index?'':(order.discountCents/100).toFixed(2),index?'':(order.totalCents/100).toFixed(2),index?'':(order.tenderedCents/100).toFixed(2),index?'':(order.changeCents/100).toFixed(2),STATUS_NAMES[status] || '有效',index?'':order.customer?.name || '',index?'':order.customer?.phone || '',index?'':order.note || '',index||status==='completed'?'':dateTime(order.voidedAt),index?'':order.voidReason || ''];
   }));
   downloadFile(`wahfat-pos-sales-${new Date().toISOString().slice(0,10)}.csv`,'﻿'+[headers,...rows].map(row=>row.map(csvCell).join(',')).join('\r\n'),'text/csv;charset=utf-8');toast('銷售明細已準備下載。');
 }
@@ -431,7 +431,7 @@ function reportBody(day) {
   <h3 class="section-title">付款方式</h3><div class="table-wrap"><table class="report-table"><thead><tr><th>付款方式</th><th>單數</th><th>銷售</th><th>作廢／退款</th><th>淨額</th></tr></thead><tbody>${day.methods.map(m=>`<tr><td>${esc(PAYMENT_NAMES[m.method] || m.method)}</td><td>${m.count}</td><td>${money(m.salesCents)}</td><td>${m.voidCents?'−'+money(m.voidCents):'—'}</td><td><b>${netMoney(m.netCents)}</b></td></tr>`).join('')}</tbody></table></div>
   ${day.items.length?`<h3 class="section-title">銷售商品</h3><div class="table-wrap"><table class="report-table"><thead><tr><th>商品／款式</th><th>數量</th><th>金額</th></tr></thead><tbody>${day.items.slice(0,30).map(row=>`<tr><td>${esc(row.title)}<small>${esc(row.variantTitle)}${row.sku?` · ${esc(row.sku)}`:''}</small></td><td>${row.quantity}</td><td>${money(row.amountCents)}</td></tr>`).join('')}</tbody></table></div>${day.items.length>30?`<p class="report-note">只顯示銷量最多的 30 款，其餘 ${day.items.length-30} 款請下載 CSV 查看。</p>`:''}`:''}
   ${day.voids.length?`<h3 class="section-title">作廢／退款</h3><ul class="report-voids">${day.voids.map(v=>`<li><b>${esc(v.id)}</b> · ${STATUS_NAMES[v.status]} · ${money(v.totalCents)} · ${esc(PAYMENT_NAMES[v.paymentMethod] || v.paymentMethod)}<small>${esc(dateTime(v.voidedAt))} · 原因：${esc(v.reason)}</small></li>`).join('')}</ul>`:''}
-  <p class="report-note">銷售按訂單日期計算；作廢及退款按處理日期扣除。商品金額未扣除訂單折扣，並只包括目前仍然有效的訂單。這是本機試用記錄，不包括開市備用金或外部收款核對。</p>`;
+  <p class="report-note">銷售按訂單日期計算；作廢及退款按處理日期扣除。商品金額未扣除訂單折扣，並只包括目前仍然有效的訂單。這是雲端交易記錄，不包括開市備用金或外部收款核對。</p>`;
 }
 function renderReport() { $('#report-body').innerHTML=reportBody(summarizeDay(state.orders,state.reportDate)); }
 function openReport(dateKey=hkDateKey(new Date().toISOString())) {
@@ -443,7 +443,7 @@ function openReport(dateKey=hkDateKey(new Date().toISOString())) {
 function setReportDate(dateKey) { if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey||'')) return;state.reportDate=dateKey;$('#report-date').value=dateKey;renderReport(); }
 function printReport() {
   const day=summarizeDay(state.orders,state.reportDate);
-  $('#print-receipt').innerHTML=`<div class="receipt report-print"><div class="receipt-heading"><h3>華發 · 日結報表</h3><p>${esc(day.date)} · 本機試用記錄</p></div>${reportBody(day)}</div>`;window.print();
+  $('#print-receipt').innerHTML=`<div class="receipt report-print"><div class="receipt-heading"><h3>華發 · 日結報表</h3><p>${esc(day.date)} · 雲端交易記錄</p></div>${reportBody(day)}</div>`;window.print();
 }
 function exportReportCsv() {
   const day=summarizeDay(state.orders,state.reportDate),num=cents=>({n:(cents/100).toFixed(2)});
@@ -532,7 +532,7 @@ function bindEvents() {
     if(event.key==='Tab'){const focusables=[...$('#modal-root').querySelectorAll('button:not([disabled]),a[href],input,select')].filter(el=>el.offsetParent!==null);const first=focusables[0],last=focusables.at(-1);if(event.shiftKey && document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first?.focus();}}
   });
   document.addEventListener('error',event=>{const img=event.target;if(img.tagName==='IMG'){const placeholder=document.createElement('span');placeholder.className='no-image';placeholder.innerHTML=icon('image')+'圖片暫未載入';img.replaceWith(placeholder);}},true);
-  window.addEventListener('storage',event=>{if(event.key===ORDERS_KEY){state.orders=readableOrders(readStorage(ORDERS_KEY,[]));if(state.orders.some(o=>o.id===state.cart.id)){state.cart=freshCart();persistCart();renderCart();closeModal();toast('這張訂單已在另一個分頁完成。');}}});
+  // Cloud orders are authoritative; legacy local order storage events must not overwrite them.
 }
 async function init() {
   paintIcons();bindEvents();$('#today-label').textContent=new Date().toLocaleDateString('zh-HK',{timeZone:'Asia/Hong_Kong',month:'long',day:'numeric',weekday:'short'});
