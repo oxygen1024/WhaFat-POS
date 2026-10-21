@@ -18,6 +18,10 @@ function mockSupabase() {
       if (url.searchParams.get('grant_type') === 'refresh_token' && db.rejectRefresh) return json({ error: 'invalid_grant', error_description: 'Invalid Refresh Token' }, 400);
       return json({ access_token: 'token-' + Date.now(), refresh_token: 'refresh-' + Date.now(), expires_in: 3600 });
     }
+    if (url.pathname === '/rest/v1/rpc/pos_is_authorized') {
+      if (db.authorized === undefined) return json({ code: 'PGRST202', message: 'Could not find the function' }, 404);
+      return json(db.authorized);
+    }
     if (url.pathname === '/rest/v1/rpc/pos_save_sale') {
       db.saveCalls++;
       const sale = route.request().postDataJSON().p_sale;
@@ -144,6 +148,34 @@ await step('Logout from the info panel returns to the login screen', async () =>
   await page.click('[data-action="logout"]');
   await page.locator('#cloud-login-form').waitFor();
   assert.equal(await page.evaluate(() => localStorage.getItem('whafat-pos-cloud-session-v1')), null);
+  await context.close();
+});
+
+await step('An account that is not on the POS allow-list is told so instead of seeing an empty history', async () => {
+  const db = mockSupabase();
+  db.authorized = false;
+  db.orders.push({ id: 'WF-X', receipt_json: {}, status: 'completed', created_at: new Date().toISOString() });
+  const { context, page } = await freshPage(db);
+  await page.fill('#cloud-login-form [name=email]', 'other@example.com');
+  await page.fill('#cloud-login-form [name=password]', 'pw');
+  await page.click('#cloud-login-form button');
+  await page.locator('#cloud-login-error').getByText('未獲授權').waitFor();
+  assert.equal(await page.evaluate(() => localStorage.getItem('whafat-pos-cloud-session-v1')), null);
+  // A stored session for such an account shows the same message on reload.
+  db.authorized = true;
+  await login(page);
+  db.authorized = false;
+  await page.reload();
+  await page.locator('#cloud-login-error').getByText('未獲授權').waitFor();
+  await context.close();
+});
+
+await step('An authorized account passes the access check and logs in', async () => {
+  const db = mockSupabase();
+  db.authorized = true;
+  const { context, page } = await freshPage(db);
+  await login(page);
+  assert.equal(await page.locator('#cloud-status').getAttribute('data-state'), 'online');
   await context.close();
 });
 

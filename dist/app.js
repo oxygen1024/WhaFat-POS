@@ -6,6 +6,7 @@ const cloud = makeCloudClient();
 let cloudReady = false;
 let pendingSale = null;
 let cloudRefreshPromise = null;
+let loginNotice = '';
 async function cloudOrdersRefresh() {
   if (cloudRefreshPromise) return cloudRefreshPromise;
   cloudRefreshPromise = (async () => {
@@ -32,10 +33,15 @@ function handleCloudError(error) {
   if (!document.querySelector('#cloud-login-cover')) { state.processing=false;closeModal();void requireCloudLogin(); }
   return true;
 }
+const NOT_AUTHORIZED='此帳戶未獲授權使用華發 POS，睇唔到雲端交易。請用店舖帳戶登入，或請管理員授權此帳戶。';
+async function connectCloud() {
+  if ((await cloud.hasAccess())===false) { cloud.logout(); throw new Error(NOT_AUTHORIZED); }
+  await cloudOrdersRefresh();
+}
 async function requireCloudLogin() {
   if (cloud.isSignedIn) {
-    try { await cloud.ensureSession(); await cloudOrdersRefresh(); cloudReady=true; cloudStatusFromState(); return; }
-    catch (error) { console.warn('Cloud session needs login',error); }
+    try { await cloud.ensureSession(); await connectCloud(); cloudReady=true; cloudStatusFromState(); return; }
+    catch (error) { console.warn('Cloud session needs login',error); if (error.message===NOT_AUTHORIZED) loginNotice=NOT_AUTHORIZED; }
   }
   setCloudStatus('login');
   if (document.querySelector('#cloud-login-cover')) return;
@@ -44,12 +50,13 @@ async function requireCloudLogin() {
   cover.style.cssText='position:fixed;inset:0;background:#f7f7f7;z-index:99999;display:grid;place-items:center;padding:20px';
   cover.innerHTML='<form id="cloud-login-form" style="background:white;border:1px solid #ddd;border-radius:16px;padding:28px;width:min(400px,100%);display:grid;gap:14px"><h2>華發 POS · 店舖登入</h2><p>請使用已授權嘅共用 POS 帳戶。未登入無法收銀。</p><label>電郵<input name="email" type="email" autocomplete="username" required style="width:100%;padding:12px"></label><label>密碼<input name="password" type="password" autocomplete="current-password" required style="width:100%;padding:12px"></label><p id="cloud-login-error" role="alert" style="color:#b00020"></p><button type="submit" style="padding:14px;background:#e9c22c;border:0;border-radius:8px;font-weight:bold">登入 POS</button></form>';
   document.body.appendChild(cover);
+  if (loginNotice) { cover.querySelector('#cloud-login-error').textContent=loginNotice;loginNotice=''; }
   cover.querySelector('form').addEventListener('submit',async event=>{
     event.preventDefault();
     const form=event.currentTarget,button=form.querySelector('button'),error=form.querySelector('#cloud-login-error');
     button.disabled=true;error.textContent='';
-    try { await cloud.login(form.elements.email.value,form.elements.password.value);await cloudOrdersRefresh();cloudReady=true;cloudStatusFromState();cover.remove(); }
-    catch(e) { error.textContent='登入或讀取交易失敗：'+e.message; }
+    try { await cloud.login(form.elements.email.value,form.elements.password.value);await connectCloud();cloudReady=true;cloudStatusFromState();cover.remove(); }
+    catch(e) { error.textContent=e.message===NOT_AUTHORIZED?e.message:'登入或讀取交易失敗：'+e.message; }
     finally { button.disabled=false; }
   });
 }

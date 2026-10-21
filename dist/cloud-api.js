@@ -83,8 +83,14 @@ export function makeCloudClient(publishableKey = SUPABASE_PUBLISHABLE_KEY) {
     if (!Array.isArray(rows)) throw new CloudError('雲端交易資料格式不正確。');
     return rows[0] || null;
   }
+  // false = signed in but not on the POS allow-list (RLS would silently return no rows).
+  // null = the check function is not deployed yet, so access is unknown.
+  async function hasAccess() {
+    try { return (await rpc('pos_is_authorized', {})) === true; }
+    catch (error) { if (error instanceof CloudError && error.status === 404) return null; throw error; }
+  }
   return {
-    login, ensureSession, logout: () => saveSession(null),
+    login, hasAccess, ensureSession, logout: () => saveSession(null),
     get isSignedIn() { return !!session?.access_token; },
     saveSale: sale => rpc('pos_save_sale', { p_sale: sale }),
     voidSale: (id, type, reason) => rpc('pos_void_sale', { p_order_id: id, p_type: type, p_reason: reason }),
