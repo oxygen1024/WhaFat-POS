@@ -127,3 +127,4 @@ mark{background:#f6e7a8;color:inherit;border-radius:2px;padding:0 1px}
 .search-box:focus-within,.vp-search:focus-within{border-color:var(--yellow-deep);box-shadow:0 0 0 2px #f3cb3f55}
 .count-bubble{background:var(--yellow-soft);color:#7a5c00}
 .payment-confirm input{accent-color:var(--yellow-deep)}
+.trial-badge[data-state=online] i{background:#2f9e5b}.trial-badge[data-state=offline] i,.trial-badge[data-state=error] i{background:#c4452f}.trial-badge[data-state=offline],.trial-badge[data-state=error]{color:#a5402c;background:#fdeee9;border-color:#f6d5cb}
