@@ -1,4 +1,4 @@
-import { makeCloudClient } from './cloud-api.js';
+import { makeCloudClient } from './cloud-api.js?v=__BUILD__';
 import { parseMoney, calculateTotals, makeSale, csvCell, sanitizeCustomer, sanitizeNote, voidSale, orderStatus, validateVoidFields, validateContactFields, hkDateKey, shiftDateKey, summarizeDay, searchTokens, matchesTokens, LIMITS } from './pos-core.js?v=__BUILD__';
 
 const $ = selector => document.querySelector(selector);

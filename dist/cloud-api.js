@@ -1,4 +1,4 @@
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './cloud-config.js';
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './cloud-config.js?v=__BUILD__';
 /** WhaFat POS production cloud API. */
 const PROJECT_URL = SUPABASE_URL;
 const STORAGE_KEY = 'whafat-pos-cloud-session-v1';
