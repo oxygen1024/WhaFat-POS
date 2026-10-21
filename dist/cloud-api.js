@@ -1,8 +1,9 @@
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './cloud-config.js';
 /** WhaFat POS cloud API — staging only, not yet loaded by production app. */
-const PROJECT_URL = 'https://crbhacmnjtzokvzqwkex.supabase.co';
+const PROJECT_URL = SUPABASE_URL;
 const STORAGE_KEY = 'whafat-pos-cloud-session-v1';
 export class CloudError extends Error {}
-export function makeCloudClient(publishableKey) {
+export function makeCloudClient(publishableKey = SUPABASE_PUBLISHABLE_KEY) {
   if (!publishableKey || typeof publishableKey !== 'string') throw new CloudError('Supabase publishable key is required.');
   let session = null;
   try { session = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch { /* Require login again */ }
