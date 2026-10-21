@@ -9,7 +9,7 @@ export function makeCloudClient(publishableKey = SUPABASE_PUBLISHABLE_KEY) {
   try { session = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch { /* Require login again */ }
   const headers = (accessToken, extra = {}) => ({
     apikey: publishableKey,
-    Authorization: 'Bearer ' + (accessToken || publishableKey),
+    ...(accessToken ? { Authorization: 'Bearer ' + accessToken } : {}),
     ...extra
   });
   async function request(path, options = {}, token = session?.access_token) {
@@ -19,8 +19,8 @@ export function makeCloudClient(publishableKey = SUPABASE_PUBLISHABLE_KEY) {
     return data;
   }
   function saveSession(value) {
-    session = value;
-    if (value) localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+    session = value ? { ...value, expires_at: value.expires_at || (Date.now()/1000 + (value.expires_in || 3600)) } : null;
+    if (session) localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
     else localStorage.removeItem(STORAGE_KEY);
   }
   async function login(email, password) {
