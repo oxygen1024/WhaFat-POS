@@ -186,7 +186,7 @@ function addToCart(product,variant,quantity) {
 function openModal(title,content,{wide=false,footer='',kind='generic',refocus=true}={}) {
   if (!state.modal) state.lastFocus=document.activeElement;
   state.modal=kind;
-  $('#modal-root').innerHTML=`<div class="modal-backdrop"><section class="modal ${wide?'wide':''}" role="dialog" aria-modal="true" aria-labelledby="modal-title"><header class="modal-header"><div><span class="eyebrow">WAH FAT · 本機試用</span><h2 id="modal-title">${esc(title)}</h2></div><button class="icon-button" data-action="close-modal" aria-label="關閉">${icon('close')}</button></header><div class="modal-body">${content}</div>${footer?`<footer class="modal-footer">${footer}</footer>`:''}</section></div>`;
+  $('#modal-root').innerHTML=`<div class="modal-backdrop"><section class="modal ${wide?'wide':''}" role="dialog" aria-modal="true" aria-labelledby="modal-title"><header class="modal-header"><div><span class="eyebrow">WAH FAT · 雲端 POS</span><h2 id="modal-title">${esc(title)}</h2></div><button class="icon-button" data-action="close-modal" aria-label="關閉">${icon('close')}</button></header><div class="modal-body">${content}</div>${footer?`<footer class="modal-footer">${footer}</footer>`:''}</section></div>`;
   if (refocus) $('#modal-root [data-action="close-modal"]').focus({preventScroll:true});
 }
 function closeModal() { if (state.processing) return;$('#modal-root').innerHTML='';state.modal=null;state.lastFocus?.focus?.({preventScroll:true}); }
