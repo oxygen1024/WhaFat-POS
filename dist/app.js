@@ -328,8 +328,8 @@ function receiptMarkup(order) {
   return `<div class="receipt"><div class="receipt-heading"><h3>華發</h3><p>華發科技有限公司 · 雲端交易收據</p><p>試用記錄 · 並非實際付款憑證</p></div>${receiptVoid(order)}<div class="receipt-meta">${esc(order.id)}<br>${esc(dateTime(order.createdAt))}<br>付款記錄：${esc(PAYMENT_NAMES[order.paymentMethod] || order.paymentMethod)}</div>${receiptContact(order)}${order.items.map(item=>`<div class="receipt-line"><div>${esc(item.title)}<small>${esc(item.variantTitle)} · ${item.quantity} × ${money(item.priceCents)}</small></div><span>${money(item.quantity*item.priceCents)}</span></div>`).join('')}<div class="receipt-totals"><div class="receipt-line"><span>商品小計</span><span>${money(order.subtotalCents)}</span></div>${order.discountCents?`<div class="receipt-line"><span>訂單折扣</span><span>−${money(order.discountCents)}</span></div>`:''}<div class="receipt-line receipt-total"><span>應收總額</span><span>${money(order.totalCents)}</span></div>${order.paymentMethod==='cash'?`<div class="receipt-line"><span>實收現金</span><span>${money(order.tenderedCents)}</span></div><div class="receipt-line"><span>找續</span><span>${money(order.changeCents)}</span></div>`:''}</div><div class="receipt-bottom">交易紀錄儲存於雲端。<br>此系統未接駁支付平台或網站庫存。</div></div>`;
 }
 function printReceipt(order) {if(!order)return;$('#print-receipt').innerHTML=receiptMarkup(order);window.print();}
-async function openHistory() {
-  if(cloudReady)try { await cloudOrdersRefresh(); } catch(error) { console.warn('History refresh failed',error); }
+async function openHistory(skipRefresh=false) {
+  if(cloudReady && !skipRefresh)try { await cloudOrdersRefresh(); } catch(error) { console.warn('History refresh failed',error); }
   const valid=state.orders.filter(order=>orderStatus(order)==='completed'),total=valid.reduce((sum,o)=>sum+o.totalCents,0),voided=state.orders.length-valid.length;
   openModal('交易記錄',`<p class="info-note">以下為雲端交易記錄；重新開啟可更新資料。</p><div class="history-summary"><div><strong>${valid.length}</strong><span>雲端訂單</span></div><div><strong>${money(total)}</strong><span>已記錄金額</span></div>${voided?`<div><strong>${voided}</strong><span>已作廢／退款</span></div>`:''}</div><div class="order-list">${state.orders.length?state.orders.map(order=>{const status=orderStatus(order);return `<button class="order-row ${status==='completed'?'':'is-void'}" data-order="${esc(order.id)}"><div><strong>${esc(order.id)}${status==='completed'?'':` <span class="status-badge">${STATUS_NAMES[status]}</span>`}</strong><small>${esc(dateTime(order.createdAt))} · ${esc(PAYMENT_NAMES[order.paymentMethod] || order.paymentMethod)} · ${order.itemCount} 件${order.customer?.name?` · ${esc(order.customer.name)}`:''}</small></div><span class="order-amount">${money(order.totalCents)}<small>查看收據 ↗</small></span></button>`;}).join(''):'<div class="empty-results"><h2>還未有交易記錄</h2><p>完成第一張訂單後，即可在此查看及列印收據。</p></div>'}</div>`,{wide:true,kind:'history',footer:'<button class="secondary-button" data-action="export-json">匯出備份 JSON</button><button class="secondary-button" data-action="export-csv">匯出銷售 CSV</button>'});
 }
@@ -562,12 +562,18 @@ async function init() {
   } catch(error) {$('#product-grid').innerHTML=`<div class="empty-results"><h2>未能載入商品目錄</h2><p>${esc(error.message)}<br>請確認網絡後重新整理頁面。</p><button class="secondary-button" onclick="location.reload()" style="margin-top:20px">重新載入</button></div>`;$('#result-count').textContent='商品目錄未就緒';}
 }
 init().then(requireCloudLogin);
-document.addEventListener('visibilitychange',async()=>{
-  if(document.visibilityState==='visible' && cloudReady) {
-    try { await cloudOrdersRefresh(); } catch(e) { console.warn('Cloud refresh failed',e); }
-  }
+async function syncVisibleCloudOrders() {
+  if (!cloudReady || !navigator.onLine || document.visibilityState !== 'visible' || state.processing) return;
+  try {
+    await cloudOrdersRefresh();
+    // Refresh the open view too: updating state.orders alone does not update its HTML.
+    if (state.modal === 'history') await openHistory(true);
+    else if (state.modal === 'report') renderReport();
+  } catch (error) { console.warn('Cloud refresh failed', error); }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') void syncVisibleCloudOrders();
 });
-setInterval(async()=>{
-  if(!cloudReady || !navigator.onLine || document.visibilityState!=='visible')return;
-  try { await cloudOrdersRefresh(); } catch(e) { console.warn('Cloud refresh failed',e); }
-},30000);
+window.addEventListener('focus', () => { void syncVisibleCloudOrders(); });
+window.addEventListener('online', () => { void syncVisibleCloudOrders(); });
+setInterval(() => { void syncVisibleCloudOrders(); }, 15000);
