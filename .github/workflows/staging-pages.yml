@@ -1,0 +1,19 @@
+name: Deploy POS Staging Preview
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/supabase-pos-sync
+      - name: Stamp build
+        run: grep -rl '__BUILD__' dist --include='*.html' --include='*.js' | xargs -r sed -i "s/__BUILD__/${GITHUB_SHA::7}/g"
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: whafat-pos-staging
+          path: dist/

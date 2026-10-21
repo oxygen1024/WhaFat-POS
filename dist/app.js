@@ -1,6 +1,35 @@
+import { makeCloudClient } from './cloud-api.js';
 import { parseMoney, calculateTotals, makeSale, csvCell, sanitizeCustomer, sanitizeNote, voidSale, orderStatus, validateVoidFields, validateContactFields, hkDateKey, shiftDateKey, summarizeDay, searchTokens, matchesTokens, LIMITS } from './pos-core.js?v=__BUILD__';
 
 const $ = selector => document.querySelector(selector);
+const cloud = makeCloudClient();
+let cloudReady = false;
+let pendingSale = null;
+async function cloudOrdersRefresh() {
+  const rows = await cloud.orders();
+  if(rows.length >= 1000) console.warn('Only the latest 1000 cloud orders are loaded; historical reports may be incomplete.');
+  state.orders = readableOrders(rows.filter(row => row.receipt_json).map(row => ({...row.receipt_json, status:row.status, localOnly:true})));
+}
+async function requireCloudLogin() {
+  if (cloud.isSignedIn) {
+    try { await cloud.ensureSession(); await cloudOrdersRefresh(); cloudReady=true; return; }
+    catch (error) { console.warn('Cloud session needs login',error); }
+  }
+  const cover=document.createElement('div');
+  cover.id='cloud-login-cover';
+  cover.style.cssText='position:fixed;inset:0;background:#f7f7f7;z-index:99999;display:grid;place-items:center;padding:20px';
+  cover.innerHTML='<form id="cloud-login-form" style="background:white;border:1px solid #ddd;border-radius:16px;padding:28px;width:min(400px,100%);display:grid;gap:14px"><h2>華發 POS · 店舖登入</h2><p>請使用已授權嘅共用 POS 帳戶。未登入無法收銀。</p><label>電郵<input name="email" type="email" autocomplete="username" required style="width:100%;padding:12px"></label><label>密碼<input name="password" type="password" autocomplete="current-password" required style="width:100%;padding:12px"></label><p id="cloud-login-error" role="alert" style="color:#b00020"></p><button type="submit" style="padding:14px;background:#e9c22c;border:0;border-radius:8px;font-weight:bold">登入 POS</button></form>';
+  document.body.appendChild(cover);
+  cover.querySelector('form').addEventListener('submit',async event=>{
+    event.preventDefault();
+    const form=event.currentTarget,button=form.querySelector('button'),error=form.querySelector('#cloud-login-error');
+    button.disabled=true;error.textContent='';
+    try { await cloud.login(form.elements.email.value,form.elements.password.value);await cloudOrdersRefresh();cloudReady=true;cover.remove(); }
+    catch(e) { error.textContent='登入或讀取交易失敗：'+e.message; }
+    finally { button.disabled=false; }
+  });
+}
+
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const money = cents => 'HK$' + (Number(cents) / 100).toLocaleString('en-HK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const shortMoney = cents => '$' + (Number(cents) / 100).toLocaleString('en-HK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -253,39 +282,50 @@ function openPayment(reset=true) {
 }
 function updateChange() { if(!$('#change-amount'))return;const amount=parseMoney($('#tendered').value);const total=calculateTotals(state.cart.items,state.cart.discount).totalCents;$('#change-amount').textContent=amount!==null && amount>=total?money(amount-total):'—'; }
 async function completeSale() {
-  if(state.processing || !state.storageOk)return;
-  state.processing=true;const button=$('#complete-sale');if(button){button.disabled=true;button.textContent='正在保存記錄…';}
-  const finish=()=>{
-    const existing=readStorage(ORDERS_KEY,[]);if(!state.storageOk)throw new Error('本機記錄未能讀取，尚未完成交易。');
-    const orders=readableOrders(existing);if(!state.storageOk)throw new Error('本機記錄格式不正確，尚未完成交易。');
-    const duplicate=orders.find(order=>order.id===state.cart.id);
-    if(duplicate){state.lastSale=duplicate;state.orders=orders;state.cart=freshCart();persistCart();return duplicate;}
-    for(const item of state.cart.items){const product=state.products.find(p=>String(p.id)===String(item.productId));const variant=product&&getVariant(product,item.variantId);if(!variant || !isSaleable(variant) || variant.priceCents!==item.priceCents)throw new Error('有商品的價格或供應狀態需要重新確認。請重新加入商品。');}
-    const sale=makeSale({items:state.cart.items,discount:state.cart.discount,paymentMethod:state.paymentMethod,tenderedCents:state.paymentMethod==='cash'?parseMoney(state.paymentTendered):undefined,confirmed:state.paymentConfirmed,id:state.cart.id,customer:state.cart.customer,note:state.cart.note});
-    const next=[sale,...orders];if(!writeStorage(ORDERS_KEY,next))throw new Error('記錄未能保存，交易尚未完成。請先備份資料及檢查裝置空間。');
-    state.orders=next;state.lastSale=sale;state.cart=freshCart();persistCart();return sale;
-  };
-  try { const sale=navigator.locks?await navigator.locks.request('wahfat-pos-checkout',finish):finish();state.processing=false;renderCart();$('#cart-panel').classList.remove('open');showSuccess(sale); }
-  catch(error){state.processing=false;const el=$('#payment-error');if(el){el.textContent=error.message;el.hidden=false;}if(button){button.disabled=!state.storageOk;button.textContent='完成本機試用記錄';}}
+  if (state.processing || !state.storageOk) return;
+  if (!cloudReady || !navigator.onLine) { toast('雲端未連線，暫停收銀，避免遺失交易。'); return; }
+  state.processing=true;
+  const button=$('#complete-sale');
+  if (button) { button.disabled=true;button.textContent='正在儲存雲端交易…'; }
+  try {
+    for (const item of state.cart.items) {
+      const product=state.products.find(p=>String(p.id)===String(item.productId));
+      const variant=product&&getVariant(product,item.variantId);
+      if (!variant || !isSaleable(variant) || variant.priceCents!==item.priceCents) throw new Error('有商品的價格或供應狀態需要重新確認。');
+    }
+    const sale=pendingSale?.id===state.cart.id ? pendingSale : makeSale({items:state.cart.items,discount:state.cart.discount,paymentMethod:state.paymentMethod,tenderedCents:state.paymentMethod==='cash'?parseMoney(state.paymentTendered):undefined,confirmed:state.paymentConfirmed,id:state.cart.id,customer:state.cart.customer,note:state.cart.note});
+    pendingSale=sale;
+    // Cloud write is the source of truth. Never mark a sale successful based only on local storage.
+    await cloud.saveSale(sale);
+    try { await cloudOrdersRefresh(); } catch (refreshError) { console.warn('Sale saved; history refresh pending', refreshError); }
+    state.lastSale={...sale,localOnly:false};
+    state.cart=freshCart();pendingSale=null;persistCart();
+    renderCart();$('#cart-panel').classList.remove('open');showSuccess(state.lastSale);
+  } catch(error) {
+    const el=$('#payment-error');
+    if(el){el.textContent=error.message+'。如網絡中斷，請先檢查交易記錄，勿另開新單重收。';el.hidden=false;}
+    if(button){button.disabled=false;button.textContent='重試儲存雲端交易';}
+  } finally {state.processing=false;}
 }
 function showSuccess(sale) {
-  openModal('記錄已儲存',`<div class="success-body"><div class="success-icon">${icon('check')}</div><h3>這張訂單完成了</h3><p>已保存至本機 · 試用交易</p><div class="success-amount">${money(sale.totalCents)}</div><p>${esc(PAYMENT_NAMES[sale.paymentMethod])}${sale.paymentMethod==='cash'?` · 找續 ${money(sale.changeCents)}`:''}</p><p style="font-size:10px;margin-top:7px">${esc(sale.id)}</p><div class="success-actions"><button class="secondary-button" data-action="print-last">${icon('print')} 列印試用收據</button><button class="primary-button" data-action="close-modal">開始下一張訂單 →</button></div></div>`,{kind:'success'});
+  openModal('記錄已儲存',`<div class="success-body"><div class="success-icon">${icon('check')}</div><h3>這張訂單完成了</h3><p>已儲存至雲端</p><div class="success-amount">${money(sale.totalCents)}</div><p>${esc(PAYMENT_NAMES[sale.paymentMethod])}${sale.paymentMethod==='cash'?` · 找續 ${money(sale.changeCents)}`:''}</p><p style="font-size:10px;margin-top:7px">${esc(sale.id)}</p><div class="success-actions"><button class="secondary-button" data-action="print-last">${icon('print')} 列印收據</button><button class="primary-button" data-action="close-modal">開始下一張訂單 →</button></div></div>`,{kind:'success'});
 }
 function receiptVoid(order) { const status=orderStatus(order);return status==='completed'?'':`<div class="receipt-void"><strong>${STATUS_NAMES[status]}</strong><br>${esc(dateTime(order.voidedAt))}<br>原因：${esc(order.voidReason)}</div>`; }
 function receiptContact(order) { return (order.customer?`<div class="receipt-meta">客戶：${esc(order.customer.name || '—')}${order.customer.phone?`<br>電話：${esc(order.customer.phone)}`:''}</div>`:'')+(order.note?`<div class="receipt-meta receipt-note">備註：${esc(order.note)}</div>`:''); }
 function receiptMarkup(order) {
-  return `<div class="receipt"><div class="receipt-heading"><h3>華發</h3><p>華發科技有限公司 · 本機試用收據</p><p>試用記錄 · 並非實際付款憑證</p></div>${receiptVoid(order)}<div class="receipt-meta">${esc(order.id)}<br>${esc(dateTime(order.createdAt))}<br>付款記錄：${esc(PAYMENT_NAMES[order.paymentMethod] || order.paymentMethod)}</div>${receiptContact(order)}${order.items.map(item=>`<div class="receipt-line"><div>${esc(item.title)}<small>${esc(item.variantTitle)} · ${item.quantity} × ${money(item.priceCents)}</small></div><span>${money(item.quantity*item.priceCents)}</span></div>`).join('')}<div class="receipt-totals"><div class="receipt-line"><span>商品小計</span><span>${money(order.subtotalCents)}</span></div>${order.discountCents?`<div class="receipt-line"><span>訂單折扣</span><span>−${money(order.discountCents)}</span></div>`:''}<div class="receipt-line receipt-total"><span>應收總額</span><span>${money(order.totalCents)}</span></div>${order.paymentMethod==='cash'?`<div class="receipt-line"><span>實收現金</span><span>${money(order.tenderedCents)}</span></div><div class="receipt-line"><span>找續</span><span>${money(order.changeCents)}</span></div>`:''}</div><div class="receipt-bottom">本記錄只保存在這部裝置。<br>此系統未接駁支付平台或網站庫存。</div></div>`;
+  return `<div class="receipt"><div class="receipt-heading"><h3>華發</h3><p>華發科技有限公司 · 雲端交易收據</p><p>試用記錄 · 並非實際付款憑證</p></div>${receiptVoid(order)}<div class="receipt-meta">${esc(order.id)}<br>${esc(dateTime(order.createdAt))}<br>付款記錄：${esc(PAYMENT_NAMES[order.paymentMethod] || order.paymentMethod)}</div>${receiptContact(order)}${order.items.map(item=>`<div class="receipt-line"><div>${esc(item.title)}<small>${esc(item.variantTitle)} · ${item.quantity} × ${money(item.priceCents)}</small></div><span>${money(item.quantity*item.priceCents)}</span></div>`).join('')}<div class="receipt-totals"><div class="receipt-line"><span>商品小計</span><span>${money(order.subtotalCents)}</span></div>${order.discountCents?`<div class="receipt-line"><span>訂單折扣</span><span>−${money(order.discountCents)}</span></div>`:''}<div class="receipt-line receipt-total"><span>應收總額</span><span>${money(order.totalCents)}</span></div>${order.paymentMethod==='cash'?`<div class="receipt-line"><span>實收現金</span><span>${money(order.tenderedCents)}</span></div><div class="receipt-line"><span>找續</span><span>${money(order.changeCents)}</span></div>`:''}</div><div class="receipt-bottom">交易紀錄儲存於雲端。<br>此系統未接駁支付平台或網站庫存。</div></div>`;
 }
 function printReceipt(order) {if(!order)return;$('#print-receipt').innerHTML=receiptMarkup(order);window.print();}
-function openHistory() {
-  state.orders=readableOrders(readStorage(ORDERS_KEY,[]));const valid=state.orders.filter(order=>orderStatus(order)==='completed'),total=valid.reduce((sum,o)=>sum+o.totalCents,0),voided=state.orders.length-valid.length;
-  openModal('交易記錄',`<p class="info-note">以下全部為這部裝置保存的試用交易。其他 iPad 或瀏覽器不會自動同步。</p><div class="history-summary"><div><strong>${valid.length}</strong><span>本機試用訂單</span></div><div><strong>${money(total)}</strong><span>已記錄金額</span></div>${voided?`<div><strong>${voided}</strong><span>已作廢／退款</span></div>`:''}</div><div class="order-list">${state.orders.length?state.orders.map(order=>{const status=orderStatus(order);return `<button class="order-row ${status==='completed'?'':'is-void'}" data-order="${esc(order.id)}"><div><strong>${esc(order.id)}${status==='completed'?'':` <span class="status-badge">${STATUS_NAMES[status]}</span>`}</strong><small>${esc(dateTime(order.createdAt))} · ${esc(PAYMENT_NAMES[order.paymentMethod] || order.paymentMethod)} · ${order.itemCount} 件${order.customer?.name?` · ${esc(order.customer.name)}`:''}</small></div><span class="order-amount">${money(order.totalCents)}<small>查看收據 ↗</small></span></button>`;}).join(''):'<div class="empty-results"><h2>還未有交易記錄</h2><p>完成第一張訂單後，即可在此查看及列印收據。</p></div>'}</div>`,{wide:true,kind:'history',footer:'<button class="secondary-button" data-action="export-json">匯出備份 JSON</button><button class="secondary-button" data-action="export-csv">匯出銷售 CSV</button>'});
+async function openHistory() {
+  if(cloudReady)try { await cloudOrdersRefresh(); } catch(error) { console.warn('History refresh failed',error); }
+  const valid=state.orders.filter(order=>orderStatus(order)==='completed'),total=valid.reduce((sum,o)=>sum+o.totalCents,0),voided=state.orders.length-valid.length;
+  openModal('交易記錄',`<p class="info-note">以下為雲端交易記錄；重新開啟可更新資料。</p><div class="history-summary"><div><strong>${valid.length}</strong><span>雲端訂單</span></div><div><strong>${money(total)}</strong><span>已記錄金額</span></div>${voided?`<div><strong>${voided}</strong><span>已作廢／退款</span></div>`:''}</div><div class="order-list">${state.orders.length?state.orders.map(order=>{const status=orderStatus(order);return `<button class="order-row ${status==='completed'?'':'is-void'}" data-order="${esc(order.id)}"><div><strong>${esc(order.id)}${status==='completed'?'':` <span class="status-badge">${STATUS_NAMES[status]}</span>`}</strong><small>${esc(dateTime(order.createdAt))} · ${esc(PAYMENT_NAMES[order.paymentMethod] || order.paymentMethod)} · ${order.itemCount} 件${order.customer?.name?` · ${esc(order.customer.name)}`:''}</small></div><span class="order-amount">${money(order.totalCents)}<small>查看收據 ↗</small></span></button>`;}).join(''):'<div class="empty-results"><h2>還未有交易記錄</h2><p>完成第一張訂單後，即可在此查看及列印收據。</p></div>'}</div>`,{wide:true,kind:'history',footer:'<button class="secondary-button" data-action="export-json">匯出備份 JSON</button><button class="secondary-button" data-action="export-csv">匯出銷售 CSV</button>'});
 }
-function openReceipt(order) {state.lastSale=order;openModal('試用收據',receiptMarkup(order),{kind:'receipt',footer:`<button class="secondary-button" data-action="history">返回交易記錄</button>${orderStatus(order)==='completed'?`<button class="secondary-button danger" data-void-order="${esc(order.id)}">作廢／退款</button>`:''}<button class="primary-button" data-action="print-last">列印收據</button>`});}
+function openReceipt(order) {state.lastSale=order;openModal('交易收據',receiptMarkup(order),{kind:'receipt',footer:`<button class="secondary-button" data-action="history">返回交易記錄</button>${orderStatus(order)==='completed'?`<button class="secondary-button danger" data-void-order="${esc(order.id)}">作廢／退款</button>`:''}<button class="primary-button" data-action="print-last">列印收據</button>`});}
 function downloadFile(name,content,type) {const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function exportJson() {
-  const orders=readableOrders(readStorage(ORDERS_KEY,state.orders));
-  let backup={app:'wahfat-pos',schemaVersion:1,exportedAt:new Date().toISOString(),localOnly:true,orders};
+  const orders=state.orders;
+  let backup={app:'wahfat-pos',schemaVersion:2,exportedAt:new Date().toISOString(),source:'cloud',orders};
   if (!state.storageOk) {
     try { backup={...backup,recovery:true,rawOrders:localStorage.getItem(ORDERS_KEY),rawCart:localStorage.getItem(CART_KEY)}; }
     catch { backup={...backup,recovery:true,note:'Browser storage inaccessible; only current session data is included.',orders:state.orders,cart:state.cart}; }
@@ -369,22 +409,18 @@ function openVoid(order) {
   openModal('作廢／退款',`<form id="void-form" data-void-for="${esc(order.id)}"><p class="info-note">${esc(order.id)} · ${money(order.totalCents)} · ${esc(PAYMENT_NAMES[order.paymentMethod] || order.paymentMethod)}。此操作會將整張訂單標記為已作廢或已退款，並計入當日報表的扣減。記錄不可還原；實際退還現金或款項需自行處理，本系統不會連接支付服務。</p><div class="field"><span>處理方式</span><div class="variant-options"><label class="radio-chip"><input type="radio" name="void-type" value="void" checked><span>作廢（輸入錯誤／取消）</span></label><label class="radio-chip"><input type="radio" name="void-type" value="refund"><span>退款（顧客退貨）</span></label></div></div><label class="field"><span>原因（必填）</span><input id="void-reason" maxlength="${LIMITS.reason}" required placeholder="例如：輸入錯誤、顧客取消、貨品有問題" autocomplete="off"></label><label class="payment-confirm"><input id="void-confirm" type="checkbox"><span>我確認要處理這張訂單，並明白此操作不可還原。</span></label><p id="void-error" class="form-error" role="alert" hidden></p><button type="submit" class="primary-button danger-fill" style="width:100%">確認處理</button></form>`,{kind:'void'});
 }
 async function submitVoid(orderId) {
-  const fail=message=>{const el=$('#void-error');if (el) {el.textContent=message;el.hidden=false;}};
+  const fail=message=>{const el=$('#void-error');if(el){el.textContent=message;el.hidden=false;}};
   if (!$('#void-confirm').checked) {fail('請先剔選確認。');return;}
-  if (state.processing || !state.storageOk) return;
+  if(state.processing || !cloudReady || !navigator.onLine){fail('雲端未連線，暫時無法作廢／退款。');return;}
   const type=document.querySelector('input[name="void-type"]:checked')?.value,reason=$('#void-reason').value;
   state.processing=true;
-  const apply=()=>{
-    const orders=readableOrders(readStorage(ORDERS_KEY,[]));if (!state.storageOk) throw new Error('本機記錄未能讀取，尚未處理。');
-    const index=orders.findIndex(order=>order.id===orderId);if (index<0) throw new Error('找不到這張訂單。');
-    const updated=voidSale(orders[index],{type,reason}),next=orders.map((order,i)=>i===index?updated:order);
-    if (!writeStorage(ORDERS_KEY,next)) throw new Error('記錄未能保存，尚未處理。請先備份資料及檢查裝置空間。');
-    state.orders=next;return updated;
-  };
   try {
-    const updated=navigator.locks?await navigator.locks.request('wahfat-pos-checkout',apply):apply();
-    state.processing=false;openReceipt(updated);toast(`訂單已標記為${STATUS_NAMES[orderStatus(updated)]}。`);
-  } catch(error) {state.processing=false;fail(error.message);}
+    await cloud.voidSale(orderId,type,reason);
+    await cloudOrdersRefresh();
+    const updated=state.orders.find(order=>order.id===orderId);
+    if(updated)openReceipt(updated);
+    toast('訂單已於雲端更新。');
+  } catch(error) {fail(error.message);} finally {state.processing=false;}
 }
 
 const netMoney = cents => cents<0 ? '−'+money(-cents) : money(cents);
@@ -399,7 +435,8 @@ function reportBody(day) {
 }
 function renderReport() { $('#report-body').innerHTML=reportBody(summarizeDay(state.orders,state.reportDate)); }
 function openReport(dateKey=hkDateKey(new Date().toISOString())) {
-  state.orders=readableOrders(readStorage(ORDERS_KEY,[]));state.reportDate=dateKey;
+  if(cloudReady)cloudOrdersRefresh().then(()=>{if(document.querySelector('#report-body'))renderReport();}).catch(error=>console.warn('Report refresh failed',error));
+  state.reportDate=dateKey;
   openModal('日結報表',`<div class="report-nav"><button class="icon-button" data-report-shift="-1" aria-label="前一日">‹</button><input id="report-date" type="date" value="${esc(dateKey)}" aria-label="報表日期"><button class="icon-button" data-report-shift="1" aria-label="後一日">›</button><button class="text-button" data-report-today>今日</button></div><div id="report-body"></div>`,{wide:true,kind:'report',footer:'<button class="secondary-button" data-action="report-csv">下載報表 CSV</button><button class="primary-button" data-action="report-print">列印報表</button>'});
   renderReport();
 }
@@ -505,11 +542,20 @@ async function init() {
     state.catalog=catalog;state.products=catalog.products.map(product=>({...product,_search:[product.title,product.vendor,product.productType,...(product.tags || []),...product.variants.flatMap(v=>[v.title,v.sku,v.barcode])].filter(Boolean).join(' ').toLocaleLowerCase()}));
     state.collections=(catalog.collections || []).filter(c=>c.productCount>0 || c.productIds?.length);
     state.variants=new Map(state.products.flatMap(product=>product.variants.map(variant=>[Number(variant.id),{product,variant}])));state.favorites=readFavorites();
-    state.orders=readableOrders(readStorage(ORDERS_KEY,[]));state.cart=normalizeCart(readStorage(CART_KEY,null));persistCart();
+    state.cart=normalizeCart(readStorage(CART_KEY,null));persistCart();
     const vendors=[...new Set(state.products.map(p=>p.vendor).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
     $('#vendor-filter').innerHTML='<option value="">全部品牌</option>'+vendors.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
     $('#import-label').textContent=`網站資料 · ${new Date(catalog.importedAt).toLocaleDateString('zh-HK',{timeZone:'Asia/Hong_Kong'})}`;
     renderCategories();renderProducts();renderFavorites();renderCart();
   } catch(error) {$('#product-grid').innerHTML=`<div class="empty-results"><h2>未能載入商品目錄</h2><p>${esc(error.message)}<br>請確認網絡後重新整理頁面。</p><button class="secondary-button" onclick="location.reload()" style="margin-top:20px">重新載入</button></div>`;$('#result-count').textContent='商品目錄未就緒';}
 }
-init();
+init().then(requireCloudLogin);
+document.addEventListener('visibilitychange',async()=>{
+  if(document.visibilityState==='visible' && cloudReady) {
+    try { await cloudOrdersRefresh(); } catch(e) { console.warn('Cloud refresh failed',e); }
+  }
+});
+setInterval(async()=>{
+  if(!cloudReady || !navigator.onLine || document.visibilityState!=='visible')return;
+  try { await cloudOrdersRefresh(); } catch(e) { console.warn('Cloud refresh failed',e); }
+},30000);

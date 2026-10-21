@@ -1,8 +1,8 @@
-const VERSION = 'wahfat-pos-v2-20261020';
+const VERSION = 'wahfat-pos-cloud-v3-20261021';
 const SHELL = `${VERSION}-shell`;
 const IMAGES = `${VERSION}-images`;
 const FILES = ['./', './index.html', './app.js', './pos-core.js', './styles.css',
-  './pwa.js', './manifest.webmanifest', './data/catalog.json',
+  './pwa.js', './cloud-api.js', './cloud-config.js', './manifest.webmanifest', './data/catalog.json',
   './icons/icon-192.png', './icons/icon-512.png'];
 const ownUrl = path => new URL(path, self.registration.scope).href;
 const paths = new Set(FILES.map(path => new URL(ownUrl(path)).pathname));
