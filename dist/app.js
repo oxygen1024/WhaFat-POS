@@ -296,7 +296,7 @@ async function completeSale() {
     pendingSale=sale;
     // Cloud write is the source of truth. Never mark a sale successful based only on local storage.
     await cloud.saveSale(sale);
-    await cloudOrdersRefresh();
+    try { await cloudOrdersRefresh(); } catch (refreshError) { console.warn('Sale saved; history refresh pending', refreshError); }
     state.lastSale={...sale,localOnly:false};
     state.cart=freshCart();pendingSale=null;persistCart();
     renderCart();$('#cart-panel').classList.remove('open');showSuccess(state.lastSale);
