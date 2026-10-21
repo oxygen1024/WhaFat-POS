@@ -1,5 +1,5 @@
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './cloud-config.js';
-/** WhaFat POS cloud API — staging only, not yet loaded by production app. */
+/** WhaFat POS production cloud API. */
 const PROJECT_URL = SUPABASE_URL;
 const STORAGE_KEY = 'whafat-pos-cloud-session-v1';
 export class CloudError extends Error {}
@@ -52,7 +52,14 @@ export function makeCloudClient(publishableKey = SUPABASE_PUBLISHABLE_KEY) {
   }
   async function orders() {
     const token = await ensureSession();
-    return request('/rest/v1/orders?select=id,receipt_json,status,created_at&order=created_at.desc&limit=1000', {}, token);
+    const pageSize = 500;
+    const all = [];
+    for (let offset = 0; ; offset += pageSize) {
+      const page = await request('/rest/v1/orders?select=id,receipt_json,status,created_at&order=created_at.desc,id.desc&limit=' + pageSize + '&offset=' + offset, {}, token);
+      if (!Array.isArray(page)) throw new CloudError('雲端交易資料格式不正確，未有覆蓋現有記錄。');
+      all.push(...page);
+      if (page.length < pageSize) return all;
+    }
   }
   return {
     login, ensureSession, logout: () => saveSession(null),
