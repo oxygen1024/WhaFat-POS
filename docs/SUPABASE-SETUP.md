@@ -21,7 +21,7 @@ A dedicated Supabase project (`whafat`, ref `crbhacmnjtzokvzqwkex`) has the six 
 | Foreign keys without indexes (4) | Performance | Add indexes |
 | Leaked password protection disabled | Medium for a shared shop password | Dashboard → Authentication → Providers → Email → enable "Prevent use of leaked passwords" (may need a paid plan); otherwise use a long random password |
 
-`supabase/migrations/20261021090000_pos_security_hardening.sql` was **applied on 2026-10-21**: RLS on, catalog grants reduced, anon SELECT grants removed, indexes added. Checkout was re-checked as the authorized user in a rolled-back transaction. **Still to do:** section 4 (drop the 5 leftover INSERT/UPDATE policies) must be run in the SQL editor, because the MCP tool needs a confirmation for DROP. Advisor notices left over: lint 0029 (intentional, see above), `rls_enabled_no_policy` on `authorized_users` (intentional), and `unused_index` (new indexes, expected).
+`supabase/migrations/20261021090000_pos_security_hardening.sql` was **applied on 2026-10-21**: RLS on, catalog grants reduced, anon SELECT grants removed, indexes added. Checkout was re-checked as the authorized user in a rolled-back transaction. Section 4 (drop the 5 leftover INSERT/UPDATE policies) was run in the SQL editor; only the 6 read policies remain. Advisor notices left over: lint 0029 (intentional, see above), `rls_enabled_no_policy` on `authorized_users` (intentional), and `unused_index` (new indexes, expected).
 
 ## Done on this branch
 
@@ -33,7 +33,7 @@ A dedicated Supabase project (`whafat`, ref `crbhacmnjtzokvzqwkex`) has the six 
 
 ## Pending before release
 
-1. Run section 4 of the hardening migration in the SQL editor; enable leaked-password protection.
+1. Enable leaked-password protection.
 2. Test on two real iPads: duplicate submits, reconnect, payment confirmation, refund race conditions.
 3. Optional: replace 15 s polling with Supabase Realtime.
 4. Validate catalog import and scheduled sync separately; don't overwrite transactions.
