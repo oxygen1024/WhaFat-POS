@@ -5,10 +5,20 @@ const $ = selector => document.querySelector(selector);
 const cloud = makeCloudClient();
 let cloudReady = false;
 let pendingSale = null;
+let cloudRefreshPromise = null;
 async function cloudOrdersRefresh() {
-  const rows = await cloud.orders();
-  if(rows.length >= 1000) console.warn('Only the latest 1000 cloud orders are loaded; historical reports may be incomplete.');
-  state.orders = rows.filter(row => row.receipt_json && typeof row.receipt_json === 'object').map(row => ({...row.receipt_json, status:row.status, localOnly:true}));
+  if (cloudRefreshPromise) return cloudRefreshPromise;
+  cloudRefreshPromise = (async () => {
+    const rows = await cloud.orders();
+    // Only replace the current history after every page has loaded successfully.
+    const orders = rows.filter(row => row.receipt_json && typeof row.receipt_json === 'object')
+      .map(row => ({...row.receipt_json, status:row.status, localOnly:false}));
+    // Keep an acknowledged sale visible if the history endpoint is temporarily lagging.
+    if (state.lastSale && !orders.some(order => order.id === state.lastSale.id)) orders.unshift(state.lastSale);
+    state.orders = orders;
+  })();
+  try { return await cloudRefreshPromise; }
+  finally { cloudRefreshPromise = null; }
 }
 async function requireCloudLogin() {
   if (cloud.isSignedIn) {
@@ -297,8 +307,10 @@ async function completeSale() {
     pendingSale=sale;
     // Cloud write is the source of truth. Never mark a sale successful based only on local storage.
     await cloud.saveSale(sale);
+    // A successful RPC response is authoritative even when the history request fails.
+    state.lastSale={...sale,status:'completed',localOnly:false};
+    if (!state.orders.some(order => order.id === sale.id)) state.orders.unshift(state.lastSale);
     try { await cloudOrdersRefresh(); } catch (refreshError) { console.warn('Sale saved; history refresh pending', refreshError); }
-    state.lastSale={...sale,localOnly:false};
     state.cart=freshCart();pendingSale=null;persistCart();
     renderCart();$('#cart-panel').classList.remove('open');showSuccess(state.lastSale);
   } catch(error) {
