@@ -10,6 +10,8 @@ A dedicated Supabase project (`whafat`, ref `crbhacmnjtzokvzqwkex`) has the six 
 - Frontend may use only the project URL and publishable key, with Supabase Auth and RLS.
 - `pos_save_sale` and `pos_void_sale` are SECURITY DEFINER (owner `postgres`, `search_path=''`) and check `pos_private.is_authorized()` first. The Supabase advisor flags them (lint 0029); this is intentional because signed-in users have SELECT-only table grants, so all writes must go through these validated RPCs. They validate totals and write order/items/payment atomically. Order IDs are idempotency keys; a reused ID with different contents is rejected.
 - The authorized-user table is private; users must be explicitly added by the project administrator.
+  - 2026-10-21: two accounts are authorized (the Mac's account and the iPhone's account). An account missing from this table can still sign in, but RLS returns **no rows and no error**. `public.pos_is_authorized()` (SECURITY INVOKER, `authenticated` only) lets the app detect this at login and say so.
+  - To add another account: `insert into pos_private.authorized_users(user_id) select id from auth.users where email = '...';`
 
 ## Security review (2026-10-21)
 
