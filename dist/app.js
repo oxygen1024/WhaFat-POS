@@ -298,7 +298,7 @@ async function completeSale() {
     await cloud.saveSale(sale);
     await cloudOrdersRefresh();
     state.lastSale={...sale,localOnly:false};
-    state.cart=freshCart();persistCart();
+    state.cart=freshCart();pendingSale=null;persistCart();
     renderCart();$('#cart-panel').classList.remove('open');showSuccess(state.lastSale);
   } catch(error) {
     const el=$('#payment-error');
