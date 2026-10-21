@@ -366,7 +366,7 @@ async function openHistory(skipRefresh=false) {
   const valid=state.orders.filter(order=>orderStatus(order)==='completed'),total=valid.reduce((sum,o)=>sum+o.totalCents,0),voided=state.orders.length-valid.length;
   openModal('交易記錄',`<p class="info-note">以下為雲端交易記錄；重新開啟可更新資料。</p><div class="history-summary"><div><strong>${valid.length}</strong><span>雲端訂單</span></div><div><strong>${money(total)}</strong><span>已記錄金額</span></div>${voided?`<div><strong>${voided}</strong><span>已作廢／退款</span></div>`:''}</div><div class="order-list">${state.orders.length?state.orders.map(order=>{const status=orderStatus(order);return `<button class="order-row ${status==='completed'?'':'is-void'}" data-order="${esc(order.id)}"><div><strong>${esc(order.id)}${status==='completed'?'':` <span class="status-badge">${STATUS_NAMES[status]}</span>`}</strong><small>${esc(dateTime(order.createdAt))} · ${esc(PAYMENT_NAMES[order.paymentMethod] || order.paymentMethod)} · ${order.itemCount} 件${order.customer?.name?` · ${esc(order.customer.name)}`:''}</small></div><span class="order-amount">${money(order.totalCents)}<small>查看收據 ↗</small></span></button>`;}).join(''):'<div class="empty-results"><h2>還未有交易記錄</h2><p>完成第一張訂單後，即可在此查看及列印收據。</p></div>'}</div>`,{wide:true,kind:'history',footer:'<button class="secondary-button" data-action="export-json">匯出備份 JSON</button><button class="secondary-button" data-action="export-csv">匯出銷售 CSV</button>'});
 }
-function openReceipt(order) {state.lastSale=order;openModal('交易收據',receiptMarkup(order),{kind:'receipt',footer:`<button class="secondary-button" data-action="history">返回交易記錄</button>${orderStatus(order)==='completed'?`<button class="secondary-button danger" data-void-order="${esc(order.id)}">作廢／退款</button>`:''}<button class="primary-button" data-action="print-last">列印收據</button>`});}
+function openReceipt(order) {state.lastSale=order;openModal('交易收據',receiptMarkup(order),{kind:'receipt',footer:`<button class="secondary-button" data-action="history">返回交易記錄</button>${orderStatus(order)==='completed'?`<button class="secondary-button danger" data-void-order="${esc(order.id)}">作廢／退款</button>`:''}<button class="secondary-button danger" data-delete-order="${esc(order.id)}">刪除記錄</button><button class="primary-button" data-action="print-last">列印收據</button>`});}
 function downloadFile(name,content,type) {const url=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function exportJson() {
   const orders=state.orders;
@@ -474,6 +474,20 @@ async function submitVoid(orderId) {
   } catch(error) {if(!handleCloudError(error))fail(error.message);} finally {state.processing=false;}
 }
 
+async function deleteOrder(orderId) {
+  const order=state.orders.find(o=>o.id===orderId);if(!order||state.processing)return;
+  if(!cloudReady || !navigator.onLine){toast('雲端未連線，暫時無法刪除記錄。');return;}
+  if(!confirm(`確定刪除訂單 ${orderId}（${money(order.totalCents)}）？\n刪除後所有裝置都會消失，無法復原，日結報表亦會改變。`))return;
+  state.processing=true;
+  try {
+    await cloud.deleteSale(orderId);
+    state.orders=state.orders.filter(o=>o.id!==orderId);
+    if(state.lastSale?.id===orderId)state.lastSale=null;
+    state.processing=false;
+    try { await cloudOrdersRefresh(); } catch(error) { console.warn('History refresh failed',error); }
+    await openHistory(true);toast('記錄已刪除。');
+  } catch(error) {if(!handleCloudError(error))toast('未能刪除：'+error.message);} finally {state.processing=false;}
+}
 const netMoney = cents => cents<0 ? '−'+money(-cents) : money(cents);
 function reportBody(day) {
   if (!day.orderCount && !day.voidCount) return '<div class="empty-results"><h2>這一日未有交易記錄</h2><p>可以按左右箭咀轉日，或揀其他日期。</p></div>';
@@ -545,6 +559,7 @@ function bindEvents() {
     const discard=event.target.closest('[data-held-delete]');if(discard){if(discard.dataset.armed)deleteHeld(discard.dataset.heldDelete);else{discard.dataset.armed='1';discard.textContent='確定刪除？';}return;}
     const shift=event.target.closest('[data-report-shift]');if(shift){setReportDate(shiftDateKey(state.reportDate,Number(shift.dataset.reportShift)));return;}
     if(event.target.closest('[data-report-today]')){setReportDate(hkDateKey(new Date().toISOString()));return;}
+    const deleteBtn=event.target.closest('[data-delete-order]');if(deleteBtn){void deleteOrder(deleteBtn.dataset.deleteOrder);return;}
     const voidOrder=event.target.closest('[data-void-order]');if(voidOrder){const record=state.orders.find(o=>o.id===voidOrder.dataset.voidOrder);if(record)openVoid(record);return;}
     const method=event.target.closest('[data-payment]');if(method){state.paymentMethod=method.dataset.payment;state.paymentConfirmed=false;openPayment(false);return;}
     const tender=event.target.closest('[data-tender]');if(tender){state.paymentTendered=(Number(tender.dataset.tender)/100).toFixed(2);$('#tendered').value=state.paymentTendered;updateChange();return;}
