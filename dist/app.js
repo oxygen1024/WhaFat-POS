@@ -545,3 +545,12 @@ async function init() {
   } catch(error) {$('#product-grid').innerHTML=`<div class="empty-results"><h2>未能載入商品目錄</h2><p>${esc(error.message)}<br>請確認網絡後重新整理頁面。</p><button class="secondary-button" onclick="location.reload()" style="margin-top:20px">重新載入</button></div>`;$('#result-count').textContent='商品目錄未就緒';}
 }
 init().then(requireCloudLogin);
+document.addEventListener('visibilitychange',async()=>{
+  if(document.visibilityState==='visible' && cloudReady) {
+    try { await cloudOrdersRefresh(); } catch(e) { console.warn('Cloud refresh failed',e); }
+  }
+});
+setInterval(async()=>{
+  if(!cloudReady || !navigator.onLine || document.visibilityState!=='visible')return;
+  try { await cloudOrdersRefresh(); } catch(e) { console.warn('Cloud refresh failed',e); }
+},30000);
