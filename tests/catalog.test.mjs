@@ -7,15 +7,37 @@ import path from 'node:path';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const catalog = JSON.parse(await readFile(path.join(root, 'dist/data/catalog.json'), 'utf8'));
 const sourceRoot = path.join(root, 'data/source');
-const snapshots = (await readdir(sourceRoot, { withFileTypes: true }))
-  .filter(entry => entry.isDirectory() && /^\d{8}T\d{6}Z$/.test(entry.name))
-  .map(entry => entry.name).sort();
-assert.ok(snapshots.length, 'At least one captured website snapshot is required');
-const snapshot = path.join(sourceRoot, snapshots.at(-1));
-const pages = (await readdir(snapshot)).filter(name => /^products-page-\d+\.json$/.test(name)).sort();
-const originals = (await Promise.all(pages.map(async name =>
-  JSON.parse(await readFile(path.join(snapshot, name), 'utf8')).products))).flat();
+// data/source is gitignored (local-only website snapshots). Without it, only the self-contained catalog checks run.
+const hasSource = await readdir(sourceRoot).then(() => true, () => false);
+const needsSource = { skip: hasSource ? false : 'data/source snapshot not present (run python3 scripts/import_catalog.py locally)' };
+let originals = [];
+if (hasSource) {
+  const snapshots = (await readdir(sourceRoot, { withFileTypes: true }))
+    .filter(entry => entry.isDirectory() && /^\d{8}T\d{6}Z$/.test(entry.name))
+    .map(entry => entry.name).sort();
+  assert.ok(snapshots.length, 'At least one captured website snapshot is required');
+  const snapshot = path.join(sourceRoot, snapshots.at(-1));
+  const pages = (await readdir(snapshot)).filter(name => /^products-page-\d+\.json$/.test(name)).sort();
+  originals = (await Promise.all(pages.map(async name =>
+    JSON.parse(await readFile(path.join(snapshot, name), 'utf8')).products))).flat();
+}
 const byId = new Map(originals.map(product => [product.id, product]));
+
+test('Catalog is internally consistent without the source snapshot', () => {
+  assert.equal(catalog.currency, 'HKD');
+  const ids = new Set(catalog.products.map(product => product.id));
+  assert.equal(ids.size, catalog.products.length);
+  const collectionIds = new Set(catalog.collections.map(collection => collection.id));
+  for (const collection of catalog.collections) for (const id of collection.productIds) assert.ok(ids.has(id), `Unknown product ${id}`);
+  for (const product of catalog.products) {
+    for (const id of product.collectionIds) assert.ok(collectionIds.has(id), `Unknown collection ${id}`);
+    assert.equal(new URL(product.sourceUrl).hostname, 'whafat-hk.com');
+    for (const variant of product.variants) {
+      assert.ok(Number.isSafeInteger(variant.priceCents) && variant.priceCents >= 0, `Bad price ${variant.id}`);
+      if (variant.imageUrl) assert.equal(new URL(variant.imageUrl).protocol, 'https:');
+    }
+  }
+});
 
 function websiteCents(value) {
   if (value == null) return null;
@@ -24,14 +46,14 @@ function websiteCents(value) {
   return Number(parts[1]) * 100 + Number((parts[2] || '').padEnd(2, '0'));
 }
 
-test('Imported catalog contains every website product exactly once', () => {
+test('Imported catalog contains every website product exactly once', needsSource, () => {
   assert.equal(catalog.currency, 'HKD');
   assert.equal(catalog.products.length, originals.length);
   assert.equal(new Set(catalog.products.map(product => product.id)).size, originals.length);
   assert.deepEqual(new Set(catalog.products.map(product => product.id)), new Set(byId.keys()));
 });
 
-test('Every variant retains the exact source price, availability, and SKU', () => {
+test('Every variant retains the exact source price, availability, and SKU', needsSource, () => {
   let variants = 0;
   for (const product of catalog.products) {
     const source = byId.get(product.id);
@@ -53,7 +75,7 @@ test('Every variant retains the exact source price, availability, and SKU', () =
   assert.ok(variants > 0);
 });
 
-test('Product and variant images come from the captured website data', () => {
+test('Product and variant images come from the captured website data', needsSource, () => {
   for (const product of catalog.products) {
     const source = byId.get(product.id);
     const imageSources = new Set(source.images.map(image => image.src));
@@ -68,7 +90,7 @@ test('Product and variant images come from the captured website data', () => {
   }
 });
 
-test('Collection references point to imported products', () => {
+test('Collection references point to imported products', needsSource, () => {
   const collectionIds = new Set(catalog.collections.map(collection => collection.id));
   for (const collection of catalog.collections) {
     for (const id of collection.productIds) assert.ok(byId.has(id), `Unknown product ${id}`);

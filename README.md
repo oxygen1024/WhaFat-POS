@@ -24,9 +24,11 @@
 
 ## 資料保存
 
-訂單與購物車儲存在當前瀏覽器，不會同步到其他 iPad 或 Shopify。不同網址／瀏覽器的記錄分開。清除網站資料可能令記錄消失，請經資料備份功能匯出。
+完成的交易會經 Supabase 儲存到雲端，所有登入同一店舖帳戶的 iPad 都睇到同一份交易記錄、日結報表及作廢／退款。收銀前要先登入；頂部狀態顯示「雲端已連線／離線／未登入」，離線時會暫停收銀，以免遺失交易。資訊頁可以登出。
 
-首次使用需連線。程式與商品目錄可在支援的瀏覽器完成快取後離線重開；只有部分看過的圖片會快取。不要把本版當作已完成正式付款、雲端備份或即時庫存系統。
+購物車、暫存訂單及常用款式仍然只保存在當前裝置。客戶名稱、電話及備註會隨交易儲存到雲端。
+
+首次使用需連線。程式與商品目錄可在支援的瀏覽器完成快取後離線重開；只有部分看過的圖片會快取。本版仍是測試版：未接駁支付服務、網站庫存或收據機。Supabase 設定及安全檢查見 `docs/SUPABASE-SETUP.md`。
 
 ## 本機開發
 
@@ -41,6 +43,7 @@ python3 -m http.server 8765 --bind 127.0.0.1 --directory dist
 node --test tests/*.test.mjs
 node tests/browser-smoke.mjs      # 需先 npm start，並設定 PLAYWRIGHT_MODULE
 node tests/browser-features.mjs   # 同上；新功能的瀏覽器測試
+node tests/browser-cloud.mjs      # 同上；用模擬 Supabase 測試登入、雲端收款、登出
 python3 scripts/import_catalog.py
 ```
 
@@ -54,6 +57,7 @@ python3 scripts/import_catalog.py
 - `docs/catalog-audit.md`：逐項資料核對、缺失與價格異常。
 - `docs/rea-evidence.json`：REA 證據識別與觀察摘要。
 - `tests/`：資料與收銀驗證。
+- `supabase/migrations/`：Supabase 資料庫變更（安全加固）。
 - `data/source/`：只存本機的原始來源快照，不部署。
 
 第一版沒有連接正式門市庫存、支付服務或收據機；iPad 真機操作需要另外驗收。
