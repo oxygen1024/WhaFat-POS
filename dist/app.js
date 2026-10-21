@@ -433,6 +433,7 @@ function reportBody(day) {
 }
 function renderReport() { $('#report-body').innerHTML=reportBody(summarizeDay(state.orders,state.reportDate)); }
 function openReport(dateKey=hkDateKey(new Date().toISOString())) {
+  if(cloudReady)cloudOrdersRefresh().then(()=>{if(document.querySelector('#report-body'))renderReport();}).catch(error=>console.warn('Report refresh failed',error));
   state.reportDate=dateKey;
   openModal('日結報表',`<div class="report-nav"><button class="icon-button" data-report-shift="-1" aria-label="前一日">‹</button><input id="report-date" type="date" value="${esc(dateKey)}" aria-label="報表日期"><button class="icon-button" data-report-shift="1" aria-label="後一日">›</button><button class="text-button" data-report-today>今日</button></div><div id="report-body"></div>`,{wide:true,kind:'report',footer:'<button class="secondary-button" data-action="report-csv">下載報表 CSV</button><button class="primary-button" data-action="report-print">列印報表</button>'});
   renderReport();
